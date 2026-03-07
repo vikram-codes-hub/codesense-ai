@@ -1,0 +1,44 @@
+{
+  "javascript": {
+    "critical": [
+      { "pattern": "eval(", "message": "eval() is dangerous — executes arbitrary code", "fix": "Never use eval() with user input" },
+      { "pattern": "innerHTML", "message": "innerHTML can cause XSS attacks", "fix": "Use textContent or sanitize input first" },
+      { "pattern": "document.write(", "message": "document.write() is unsafe", "fix": "Use DOM manipulation methods instead" }
+    ],
+    "high": [
+      { "pattern": "dangerouslySetInnerHTML", "message": "React XSS risk detected", "fix": "Sanitize HTML before rendering" },
+      { "pattern": "exec(", "message": "Shell command execution detected", "fix": "Validate and sanitize all inputs" },
+      { "pattern": "require('child_process')", "message": "Child process execution — potential command injection", "fix": "Avoid dynamic command construction" }
+    ],
+    "medium": [
+      { "pattern": "Math.random()", "message": "Math.random() is not cryptographically secure", "fix": "Use crypto.randomBytes() instead" },
+      { "pattern": "http://", "message": "Insecure HTTP connection detected", "fix": "Use HTTPS for all connections" },
+      { "pattern": "console.log(password", "message": "Possible password logged to console", "fix": "Never log sensitive data" }
+    ]
+  },
+  "python": {
+    "critical": [
+      { "pattern": "eval(", "message": "eval() executes arbitrary code", "fix": "Never use eval() with user input" },
+      { "pattern": "exec(", "message": "exec() executes arbitrary code", "fix": "Avoid dynamic code execution" },
+      { "pattern": "pickle.loads(", "message": "Unsafe deserialization — remote code execution risk", "fix": "Use JSON instead of pickle for untrusted data" }
+    ],
+    "high": [
+      { "pattern": "subprocess.call(shell=True", "message": "Shell injection risk", "fix": "Use shell=False and pass args as list" },
+      { "pattern": "os.system(", "message": "OS command injection risk", "fix": "Use subprocess with argument lists" },
+      { "pattern": "yaml.load(", "message": "Unsafe YAML loading", "fix": "Use yaml.safe_load() instead" }
+    ],
+    "medium": [
+      { "pattern": "random.random(", "message": "Not cryptographically secure", "fix": "Use secrets module for security-sensitive code" },
+      { "pattern": "MD5", "message": "MD5 is a weak hashing algorithm", "fix": "Use SHA-256 or bcrypt instead" },
+      { "pattern": "SHA1", "message": "SHA1 is a weak hashing algorithm", "fix": "Use SHA-256 or bcrypt instead" }
+    ]
+  },
+  "secrets": [
+    { "pattern": "password = \"", "message": "Hardcoded password detected", "fix": "Use environment variables" },
+    { "pattern": "api_key = \"", "message": "Hardcoded API key detected", "fix": "Use environment variables" },
+    { "pattern": "secret = \"", "message": "Hardcoded secret detected", "fix": "Use environment variables" },
+    { "pattern": "token = \"", "message": "Hardcoded token detected", "fix": "Use environment variables" },
+    { "pattern": "AWS_ACCESS_KEY", "message": "AWS credentials in code", "fix": "Use IAM roles or environment variables" },
+    { "pattern": "private_key", "message": "Private key in code", "fix": "Store keys securely outside codebase" }
+  ]
+}
