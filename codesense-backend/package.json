@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CodeSense - AI Powered Code Review Platform Backend",
   "main": "server.js",
-  "type": "module",
+
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
