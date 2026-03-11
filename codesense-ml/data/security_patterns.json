@@ -1,44 +1,481 @@
 {
   "javascript": {
     "critical": [
-      { "pattern": "eval(", "message": "eval() is dangerous — executes arbitrary code", "fix": "Never use eval() with user input" },
-      { "pattern": "innerHTML", "message": "innerHTML can cause XSS attacks", "fix": "Use textContent or sanitize input first" },
-      { "pattern": "document.write(", "message": "document.write() is unsafe", "fix": "Use DOM manipulation methods instead" }
+      {
+        "pattern": "eval(",
+        "message": "eval() executes arbitrary code — extremely dangerous",
+        "fix": "Never use eval() with user input. Find an alternative approach."
+      },
+      {
+        "pattern": "document.write(",
+        "message": "document.write() can execute malicious scripts (XSS)",
+        "fix": "Use DOM manipulation methods like createElement() or textContent instead."
+      },
+      {
+        "pattern": "innerHTML =",
+        "message": "Setting innerHTML directly can cause XSS attacks",
+        "fix": "Use textContent for plain text, or sanitize HTML with DOMPurify before using innerHTML."
+      },
+      {
+        "pattern": ".innerHTML =",
+        "message": "Setting innerHTML directly can cause XSS attacks",
+        "fix": "Use textContent for plain text, or sanitize HTML with DOMPurify before using innerHTML."
+      },
+      {
+        "pattern": "dangerouslySetInnerHTML",
+        "message": "dangerouslySetInnerHTML is a React XSS risk",
+        "fix": "Sanitize content with DOMPurify before passing to dangerouslySetInnerHTML."
+      },
+      {
+        "pattern": "child_process",
+        "message": "child_process execution detected — potential command injection",
+        "fix": "Validate and sanitize all inputs. Never build shell commands from user input."
+      },
+      {
+        "pattern": "execSync(",
+        "message": "Synchronous shell execution — command injection risk",
+        "fix": "Use execFile() with an arguments array instead of exec() with a string."
+      },
+      {
+        "pattern": "exec(",
+        "message": "Shell command execution — potential command injection",
+        "fix": "Use execFile() with an arguments array. Never pass user input to exec()."
+      },
+      {
+        "pattern": "Function(",
+        "message": "Function() constructor is similar to eval() — code injection risk",
+        "fix": "Avoid using the Function() constructor with dynamic strings."
+      },
+      {
+        "pattern": "new Function(",
+        "message": "new Function() executes arbitrary code — code injection risk",
+        "fix": "Avoid using new Function() with user-controlled input."
+      },
+      {
+        "pattern": "deserialize(",
+        "message": "Unsafe deserialization detected — remote code execution risk",
+        "fix": "Use JSON.parse() for safe deserialization instead of third-party deserialize()."
+      }
     ],
     "high": [
-      { "pattern": "dangerouslySetInnerHTML", "message": "React XSS risk detected", "fix": "Sanitize HTML before rendering" },
-      { "pattern": "exec(", "message": "Shell command execution detected", "fix": "Validate and sanitize all inputs" },
-      { "pattern": "require('child_process')", "message": "Child process execution — potential command injection", "fix": "Avoid dynamic command construction" }
+      {
+        "pattern": "require('child_process')",
+        "message": "child_process module imported — potential command injection",
+        "fix": "Validate all inputs strictly before passing to any child_process methods."
+      },
+      {
+        "pattern": "require(\"child_process\")",
+        "message": "child_process module imported — potential command injection",
+        "fix": "Validate all inputs strictly before passing to any child_process methods."
+      },
+      {
+        "pattern": "shell: true",
+        "message": "shell:true in subprocess allows shell injection attacks",
+        "fix": "Use shell: false and pass arguments as an array."
+      },
+      {
+        "pattern": "createServer(",
+        "message": "HTTP server created — ensure proper input validation and rate limiting",
+        "fix": "Add helmet.js, rate limiting, and input validation middleware."
+      },
+      {
+        "pattern": "fs.writeFile(",
+        "message": "File write operation — path traversal risk if using user input",
+        "fix": "Validate and sanitize file paths. Use path.basename() to prevent directory traversal."
+      },
+      {
+        "pattern": "fs.readFile(",
+        "message": "File read operation — path traversal risk if using user input",
+        "fix": "Validate file paths against a whitelist of allowed directories."
+      },
+      {
+        "pattern": ".cookie(",
+        "message": "Cookie being set — ensure secure flags are set",
+        "fix": "Set httpOnly: true, secure: true, and sameSite: 'strict' on all cookies."
+      },
+      {
+        "pattern": "disable('x-powered-by')",
+        "message": "Consider adding security headers",
+        "fix": "Use helmet.js to set all security headers: app.use(helmet())"
+      },
+      {
+        "pattern": "verify(",
+        "message": "JWT verify without error handling can cause authentication bypass",
+        "fix": "Always wrap jwt.verify() in try/catch and handle errors properly."
+      }
     ],
     "medium": [
-      { "pattern": "Math.random()", "message": "Math.random() is not cryptographically secure", "fix": "Use crypto.randomBytes() instead" },
-      { "pattern": "http://", "message": "Insecure HTTP connection detected", "fix": "Use HTTPS for all connections" },
-      { "pattern": "console.log(password", "message": "Possible password logged to console", "fix": "Never log sensitive data" }
+      {
+        "pattern": "Math.random()",
+        "message": "Math.random() is not cryptographically secure",
+        "fix": "Use crypto.randomBytes() or crypto.randomUUID() for security-sensitive operations."
+      },
+      {
+        "pattern": "http://",
+        "message": "Insecure HTTP connection — data transmitted in plaintext",
+        "fix": "Use HTTPS for all connections to encrypt data in transit."
+      },
+      {
+        "pattern": "console.log(password",
+        "message": "Possible password being logged to console",
+        "fix": "Never log sensitive data like passwords, tokens, or PII."
+      },
+      {
+        "pattern": "console.log(token",
+        "message": "Possible token being logged to console",
+        "fix": "Never log authentication tokens or credentials."
+      },
+      {
+        "pattern": "console.log(secret",
+        "message": "Possible secret being logged to console",
+        "fix": "Never log secrets or sensitive data to console."
+      },
+      {
+        "pattern": "localStorage.setItem",
+        "message": "Sensitive data may be stored in localStorage — accessible via XSS",
+        "fix": "Never store tokens or sensitive data in localStorage. Use httpOnly cookies instead."
+      },
+      {
+        "pattern": "sessionStorage.setItem",
+        "message": "Sensitive data may be stored in sessionStorage — accessible via XSS",
+        "fix": "Use httpOnly cookies for sensitive session data instead of sessionStorage."
+      },
+      {
+        "pattern": "allowedOrigins: ['*']",
+        "message": "CORS wildcard allows any origin to access your API",
+        "fix": "Specify allowed origins explicitly: origin: process.env.CLIENT_URL"
+      },
+      {
+        "pattern": "origin: '*'",
+        "message": "CORS wildcard (*) — any website can call your API",
+        "fix": "Restrict CORS to specific trusted origins only."
+      },
+      {
+        "pattern": "MD5(",
+        "message": "MD5 is a cryptographically broken hashing algorithm",
+        "fix": "Use bcrypt for passwords or SHA-256 for data integrity checks."
+      },
+      {
+        "pattern": "createHash('md5')",
+        "message": "MD5 hashing is cryptographically weak",
+        "fix": "Use crypto.createHash('sha256') or bcrypt for passwords."
+      },
+      {
+        "pattern": "createHash('sha1')",
+        "message": "SHA1 is deprecated and cryptographically weak",
+        "fix": "Use crypto.createHash('sha256') or stronger."
+      }
+    ],
+    "low": [
+      {
+        "pattern": "TODO: add auth",
+        "message": "Authentication not yet implemented",
+        "fix": "Implement authentication before deploying to production."
+      },
+      {
+        "pattern": "skipValidation",
+        "message": "Validation being skipped — potential security risk",
+        "fix": "Always validate and sanitize user input."
+      },
+      {
+        "pattern": "noValidate",
+        "message": "Validation disabled — potential security risk",
+        "fix": "Enable validation for all user inputs."
+      }
     ]
   },
+
   "python": {
     "critical": [
-      { "pattern": "eval(", "message": "eval() executes arbitrary code", "fix": "Never use eval() with user input" },
-      { "pattern": "exec(", "message": "exec() executes arbitrary code", "fix": "Avoid dynamic code execution" },
-      { "pattern": "pickle.loads(", "message": "Unsafe deserialization — remote code execution risk", "fix": "Use JSON instead of pickle for untrusted data" }
+      {
+        "pattern": "eval(",
+        "message": "eval() executes arbitrary Python code — extremely dangerous",
+        "fix": "Never use eval() with user input. Use ast.literal_eval() for safe evaluation of literals."
+      },
+      {
+        "pattern": "exec(",
+        "message": "exec() executes arbitrary Python code — extremely dangerous",
+        "fix": "Avoid exec() entirely. Find a safer alternative approach."
+      },
+      {
+        "pattern": "pickle.loads(",
+        "message": "pickle.loads() can execute arbitrary code during deserialization",
+        "fix": "Use JSON for data serialization. Never deserialize pickle from untrusted sources."
+      },
+      {
+        "pattern": "pickle.load(",
+        "message": "pickle.load() can execute arbitrary code during deserialization",
+        "fix": "Use JSON for data serialization. Never load pickle from untrusted files."
+      },
+      {
+        "pattern": "__import__(",
+        "message": "Dynamic import with __import__() — potential code injection",
+        "fix": "Use importlib.import_module() with a strict whitelist of allowed modules."
+      },
+      {
+        "pattern": "marshal.loads(",
+        "message": "marshal.loads() can execute arbitrary code",
+        "fix": "Avoid marshal for deserialization of untrusted data. Use JSON instead."
+      },
+      {
+        "pattern": "compile(",
+        "message": "compile() with user input allows code injection",
+        "fix": "Never compile user-controlled strings as Python code."
+      }
     ],
     "high": [
-      { "pattern": "subprocess.call(shell=True", "message": "Shell injection risk", "fix": "Use shell=False and pass args as list" },
-      { "pattern": "os.system(", "message": "OS command injection risk", "fix": "Use subprocess with argument lists" },
-      { "pattern": "yaml.load(", "message": "Unsafe YAML loading", "fix": "Use yaml.safe_load() instead" }
+      {
+        "pattern": "subprocess.call(shell=True",
+        "message": "subprocess.call with shell=True — command injection risk",
+        "fix": "Use shell=False and pass arguments as a list: subprocess.call(['cmd', 'arg'])"
+      },
+      {
+        "pattern": "subprocess.run(shell=True",
+        "message": "subprocess.run with shell=True — command injection risk",
+        "fix": "Use shell=False and pass arguments as a list: subprocess.run(['cmd', 'arg'])"
+      },
+      {
+        "pattern": "subprocess.Popen(shell=True",
+        "message": "subprocess.Popen with shell=True — command injection risk",
+        "fix": "Use shell=False and pass arguments as a list."
+      },
+      {
+        "pattern": "os.system(",
+        "message": "os.system() executes shell commands — command injection risk",
+        "fix": "Use subprocess.run() with shell=False and an arguments list instead."
+      },
+      {
+        "pattern": "os.popen(",
+        "message": "os.popen() executes shell commands — command injection risk",
+        "fix": "Use subprocess.run() with shell=False instead."
+      },
+      {
+        "pattern": "yaml.load(",
+        "message": "yaml.load() without Loader is unsafe — arbitrary code execution",
+        "fix": "Use yaml.safe_load() instead of yaml.load() for untrusted input."
+      },
+      {
+        "pattern": "xmlrpc",
+        "message": "XML-RPC is vulnerable to XML injection attacks",
+        "fix": "Use REST/JSON APIs instead of XML-RPC where possible."
+      },
+      {
+        "pattern": "flask.request.args",
+        "message": "Flask request args used — ensure input is validated",
+        "fix": "Validate and sanitize all request parameters before use."
+      }
     ],
     "medium": [
-      { "pattern": "random.random(", "message": "Not cryptographically secure", "fix": "Use secrets module for security-sensitive code" },
-      { "pattern": "MD5", "message": "MD5 is a weak hashing algorithm", "fix": "Use SHA-256 or bcrypt instead" },
-      { "pattern": "SHA1", "message": "SHA1 is a weak hashing algorithm", "fix": "Use SHA-256 or bcrypt instead" }
+      {
+        "pattern": "random.random(",
+        "message": "random.random() is not cryptographically secure",
+        "fix": "Use the secrets module for security-sensitive random values: secrets.token_hex()"
+      },
+      {
+        "pattern": "random.randint(",
+        "message": "random.randint() is not cryptographically secure",
+        "fix": "Use secrets.randbelow() for security-sensitive random integers."
+      },
+      {
+        "pattern": "hashlib.md5(",
+        "message": "MD5 is cryptographically broken",
+        "fix": "Use hashlib.sha256() for data integrity or bcrypt/argon2 for passwords."
+      },
+      {
+        "pattern": "hashlib.sha1(",
+        "message": "SHA1 is deprecated and cryptographically weak",
+        "fix": "Use hashlib.sha256() or stronger hashing algorithm."
+      },
+      {
+        "pattern": "http.server",
+        "message": "Python built-in HTTP server is not production-safe",
+        "fix": "Use a production WSGI server like gunicorn or uvicorn."
+      },
+      {
+        "pattern": "DEBUG = True",
+        "message": "Django/Flask debug mode is enabled — never use in production",
+        "fix": "Set DEBUG = False in production and use environment variables."
+      },
+      {
+        "pattern": "ALLOWED_HOSTS = ['*']",
+        "message": "Django ALLOWED_HOSTS wildcard — accepts requests from any host",
+        "fix": "Specify exact allowed hostnames: ALLOWED_HOSTS = ['yourdomain.com']"
+      },
+      {
+        "pattern": "verify=False",
+        "message": "SSL certificate verification disabled",
+        "fix": "Always verify SSL certificates. Remove verify=False and fix the certificate issue."
+      }
+    ],
+    "low": [
+      {
+        "pattern": "print(password",
+        "message": "Possible password being printed to stdout",
+        "fix": "Never print sensitive data like passwords or tokens."
+      },
+      {
+        "pattern": "print(token",
+        "message": "Possible token being printed to stdout",
+        "fix": "Never print authentication tokens or credentials."
+      },
+      {
+        "pattern": "print(secret",
+        "message": "Possible secret being printed to stdout",
+        "fix": "Never print secrets or sensitive configuration values."
+      },
+      {
+        "pattern": "except:",
+        "message": "Bare except clause catches all exceptions including SystemExit",
+        "fix": "Specify exception types: except Exception as e: or except (TypeError, ValueError) as e:"
+      },
+      {
+        "pattern": "pass  # TODO",
+        "message": "Unimplemented code block (TODO)",
+        "fix": "Implement this block before deploying to production."
+      }
     ]
   },
+
   "secrets": [
-    { "pattern": "password = \"", "message": "Hardcoded password detected", "fix": "Use environment variables" },
-    { "pattern": "api_key = \"", "message": "Hardcoded API key detected", "fix": "Use environment variables" },
-    { "pattern": "secret = \"", "message": "Hardcoded secret detected", "fix": "Use environment variables" },
-    { "pattern": "token = \"", "message": "Hardcoded token detected", "fix": "Use environment variables" },
-    { "pattern": "AWS_ACCESS_KEY", "message": "AWS credentials in code", "fix": "Use IAM roles or environment variables" },
-    { "pattern": "private_key", "message": "Private key in code", "fix": "Store keys securely outside codebase" }
+    {
+      "pattern": "password = \"",
+      "message": "Hardcoded password detected in source code",
+      "fix": "Use environment variables: os.getenv('PASSWORD') or process.env.PASSWORD"
+    },
+    {
+      "pattern": "password = '",
+      "message": "Hardcoded password detected in source code",
+      "fix": "Use environment variables: os.getenv('PASSWORD') or process.env.PASSWORD"
+    },
+    {
+      "pattern": "PASSWORD = \"",
+      "message": "Hardcoded password detected in source code",
+      "fix": "Use environment variables and never commit secrets to version control."
+    },
+    {
+      "pattern": "api_key = \"",
+      "message": "Hardcoded API key detected",
+      "fix": "Store API keys in environment variables and use .env files (add to .gitignore)."
+    },
+    {
+      "pattern": "api_key = '",
+      "message": "Hardcoded API key detected",
+      "fix": "Store API keys in environment variables and use .env files (add to .gitignore)."
+    },
+    {
+      "pattern": "API_KEY = \"",
+      "message": "Hardcoded API key detected",
+      "fix": "Store API keys in environment variables and use .env files (add to .gitignore)."
+    },
+    {
+      "pattern": "secret = \"",
+      "message": "Hardcoded secret detected",
+      "fix": "Move secrets to environment variables immediately."
+    },
+    {
+      "pattern": "secret = '",
+      "message": "Hardcoded secret detected",
+      "fix": "Move secrets to environment variables immediately."
+    },
+    {
+      "pattern": "SECRET_KEY = \"",
+      "message": "Hardcoded secret key detected",
+      "fix": "Generate a random secret key and store it in environment variables."
+    },
+    {
+      "pattern": "JWT_SECRET = \"",
+      "message": "Hardcoded JWT secret detected",
+      "fix": "Store JWT secret in environment variables: process.env.JWT_SECRET"
+    },
+    {
+      "pattern": "token = \"",
+      "message": "Hardcoded token detected",
+      "fix": "Store tokens in environment variables, never in source code."
+    },
+    {
+      "pattern": "ACCESS_TOKEN = \"",
+      "message": "Hardcoded access token detected",
+      "fix": "Store access tokens in environment variables."
+    },
+    {
+      "pattern": "GITHUB_TOKEN = \"",
+      "message": "Hardcoded GitHub token detected",
+      "fix": "Store GitHub tokens in environment variables and revoke the exposed token immediately."
+    },
+    {
+      "pattern": "MONGO_URI = \"mongodb",
+      "message": "Hardcoded MongoDB connection string detected",
+      "fix": "Store database URIs in environment variables: process.env.MONGO_URI"
+    },
+    {
+      "pattern": "mongodb+srv://",
+      "message": "MongoDB Atlas connection string with credentials in code",
+      "fix": "Move connection string to environment variables immediately."
+    },
+    {
+      "pattern": "AWS_ACCESS_KEY_ID",
+      "message": "AWS Access Key ID detected in source code",
+      "fix": "Revoke this key immediately. Use IAM roles or environment variables."
+    },
+    {
+      "pattern": "AWS_SECRET_ACCESS_KEY",
+      "message": "AWS Secret Access Key detected in source code",
+      "fix": "Revoke this key immediately. Use IAM roles or AWS Secrets Manager."
+    },
+    {
+      "pattern": "STRIPE_SECRET_KEY",
+      "message": "Stripe secret key detected — payment data at risk",
+      "fix": "Revoke this key immediately in your Stripe dashboard and use environment variables."
+    },
+    {
+      "pattern": "sk_live_",
+      "message": "Stripe live secret key detected — CRITICAL: payment data exposed",
+      "fix": "Revoke immediately at dashboard.stripe.com. Use environment variables."
+    },
+    {
+      "pattern": "sk_test_",
+      "message": "Stripe test secret key detected in source code",
+      "fix": "Even test keys should not be committed. Use environment variables."
+    },
+    {
+      "pattern": "SENDGRID_API_KEY",
+      "message": "SendGrid API key detected",
+      "fix": "Store API keys in environment variables and revoke the exposed key."
+    },
+    {
+      "pattern": "TWILIO_AUTH_TOKEN",
+      "message": "Twilio auth token detected in source code",
+      "fix": "Revoke immediately at twilio.com. Store in environment variables."
+    },
+    {
+      "pattern": "private_key",
+      "message": "Private key reference detected in source code",
+      "fix": "Store private keys in secure key management systems, never in source code."
+    },
+    {
+      "pattern": "-----BEGIN RSA PRIVATE KEY-----",
+      "message": "RSA Private key embedded in source code — CRITICAL",
+      "fix": "Remove immediately. Store private keys in secure file storage outside the repo."
+    },
+    {
+      "pattern": "-----BEGIN PRIVATE KEY-----",
+      "message": "Private key embedded in source code — CRITICAL",
+      "fix": "Remove immediately. Store private keys securely outside the repository."
+    },
+    {
+      "pattern": "client_secret",
+      "message": "OAuth client secret detected in source code",
+      "fix": "Store OAuth secrets in environment variables: process.env.GITHUB_CLIENT_SECRET"
+    },
+    {
+      "pattern": "GOOGLE_CLIENT_SECRET",
+      "message": "Google OAuth client secret detected",
+      "fix": "Store in environment variables and regenerate in Google Cloud Console."
+    },
+    {
+      "pattern": "FIREBASE_PRIVATE_KEY",
+      "message": "Firebase private key detected in source code",
+      "fix": "Store Firebase credentials in environment variables or use service account JSON securely."
+    }
   ]
 }
