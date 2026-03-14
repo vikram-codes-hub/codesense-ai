@@ -1,115 +1,121 @@
-const { Worker } = require("bullmq");
-const Issue      = require("../models/Issue");
-const Review     = require("../models/Review");
-const { postInlineComment, postSummaryComment } = require("../services/github.service");
+const { Worker }    = require('bullmq')
+const Issue         = require('../models/Issue')
+const Review        = require('../models/Review')
+const connection    = require('../config/bullmq')
+const logger        = require('../utils/logger')
+const {
+  postInlineComment,
+  postSummaryComment,
+  formatSummaryComment,
+} = require('../services/github.service')
 
 const initGithubWorker = (redisConnection) => {
-  const worker = new Worker("github", async (job) => {
+  const worker = new Worker('github', async (job) => {
     const {
       reviewId,
       repoFullName,
       prNumber,
       githubToken,
-      overallScore,
-      grade,
-      summary,
-      criticalCount,
-      totalIssues,
-    } = job.data;
+    } = job.data
 
-    console.log(`\n💬 Posting GitHub comments → PR #${prNumber} | ${repoFullName}`);
+    logger.info(`Posting GitHub comments → PR #${prNumber} | ${repoFullName}`)
 
-    // ── Step 1: Fetch all issues for this review ──────────
+    // ── Step 1: Fetch unposted issues ─────────────────────
     const issues = await Issue.find({
       reviewId,
       isPostedToGitHub: false,
-    }).sort({ severity: 1 });
+    }).sort({ severity: 1 })
 
     if (issues.length === 0) {
-      console.log("  ℹ️  No issues to post");
-      return;
+      logger.info('No issues to post')
     }
 
-    // ── Step 2: Post inline comments on each issue ────────
-    let postedCount = 0;
+    // ── Step 2: Get review for commitSha ──────────────────
+    const review = await Review.findById(reviewId)
+    if (!review) {
+      throw new Error(`Review not found: ${reviewId}`)
+    }
+
+    // ── Step 3: Post inline comments ─────────────────────
+    let postedCount = 0
 
     for (const issue of issues) {
       try {
-        await postInlineComment({
-          githubToken,
+        const body = [
+          `**[${issue.severity.toUpperCase()}] ${issue.message}**`,
+          '',
+          issue.description || '',
+          '',
+          issue.suggestion ? `💡 **Suggestion:** ${issue.suggestion}` : '',
+        ].filter(Boolean).join('\n')
+
+        await postInlineComment(
           repoFullName,
           prNumber,
-          filename  : issue.filename,
-          line      : issue.line,
-          severity  : issue.severity,
-          message   : issue.message,
-          suggestion: issue.suggestion,
-        });
+          review.commitSha,
+          issue.filename,
+          issue.line || 1,
+          body,
+          githubToken
+        )
 
-        // Mark as posted
-        await Issue.findByIdAndUpdate(issue._id, { isPostedToGitHub: true });
-        postedCount++;
+        await Issue.findByIdAndUpdate(issue._id, { isPostedToGitHub: true })
+        postedCount++
 
-        // Small delay to avoid GitHub API rate limits
-        await _sleep(300);
+        // Avoid GitHub rate limits
+        await _sleep(300)
 
       } catch (commentErr) {
-        console.error(`  ❌ Failed to post comment for ${issue.filename}:${issue.line} →`, commentErr.message);
+        logger.error(`Failed to post comment ${issue.filename}:${issue.line} → ${commentErr.message}`)
       }
     }
 
-    // ── Step 3: Post summary comment ──────────────────────
+    // ── Step 4: Post summary comment ──────────────────────
     try {
-      await postSummaryComment({
-        githubToken,
-        repoFullName,
-        prNumber,
-        overallScore,
-        grade,
-        summary,
-        criticalCount,
-        totalIssues,
-      });
+      const summaryBody = formatSummaryComment(review)
+      await postSummaryComment(repoFullName, prNumber, summaryBody, githubToken)
     } catch (summaryErr) {
-      console.error("  ❌ Failed to post summary comment:", summaryErr.message);
+      logger.error(`Failed to post summary comment: ${summaryErr.message}`)
     }
 
-    // ── Step 4: Mark review as posted ────────────────────
-    await Review.findByIdAndUpdate(reviewId, { isPostedToGitHub: true });
+    // ── Step 5: Mark review as posted ────────────────────
+    await Review.findByIdAndUpdate(reviewId, { isPostedToGitHub: true })
 
-    // ── Step 5: Emit socket event ──────────────────────────
-    global.io?.emit("review:posted", {
+    // ── Step 6: Emit socket event ─────────────────────────
+    global.io?.emit('review:posted', {
       reviewId,
       prNumber,
       repoFullName,
       postedCount,
-    });
+    })
 
-    console.log(`✅ GitHub comments posted → ${postedCount}/${issues.length} comments`);
-    return { reviewId, postedCount };
+    logger.info(`GitHub comments posted → ${postedCount}/${issues.length}`)
+    return { reviewId, postedCount }
 
   }, {
-    connection : redisConnection,
-    concurrency: 1,   // post one PR at a time to avoid rate limits
-  });
+    connection:  redisConnection,
+    concurrency: 1,
+  })
 
-  // ── Worker event handlers ─────────────────────────────
-  worker.on("completed", (job) => {
-    console.log(`✅ GitHub worker: job ${job.id} completed`);
-  });
+  worker.on('completed', (job) => {
+    logger.info(`GitHub worker: job ${job.id} completed`)
+  })
 
-  worker.on("failed", (job, err) => {
-    console.error(`❌ GitHub worker: job ${job.id} failed:`, err.message);
-  });
+  worker.on('failed', (job, err) => {
+    logger.error(`GitHub worker: job ${job.id} failed: ${err.message}`)
+  })
 
-  worker.on("error", (err) => {
-    console.error("❌ GitHub worker error:", err.message);
-  });
+  worker.on('error', (err) => {
+    logger.error(`GitHub worker error: ${err.message}`)
+  })
 
-  console.log("✅ GitHub worker initialized");
-  return worker;
-};
+  logger.info('GitHub worker initialized')
+  return worker
+}
 
-const _sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const _sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
 
-module.exports = { initGithubWorker };
+// ── Init ──────────────────────────────────────────────────
+const githubWorker = initGithubWorker(connection)
+
+module.exports = { githubWorker }

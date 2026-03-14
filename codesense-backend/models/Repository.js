@@ -50,5 +50,6 @@ const repositorySchema = new mongoose.Schema({
     default: null,
   },
 }, { timestamps: true });
+repositorySchema.index({ userId: 1, githubRepoId: 1 }, { unique: true })
 
 module.exports = mongoose.model("Repository", repositorySchema);
