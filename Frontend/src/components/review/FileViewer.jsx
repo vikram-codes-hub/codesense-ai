@@ -1,20 +1,26 @@
 import Editor from '@monaco-editor/react'
-import { mockReviewFiles } from '../../utils/mockData'
 import { useState } from 'react'
 import { FileCode, AlertCircle } from 'lucide-react'
-import { getScoreGrade } from '../../utils/mockData'
 
-export default function FileViewer({ files = mockReviewFiles, issues = [] }) {
-  const [selectedFile, setSelectedFile] = useState(files[0])
+const getScoreGrade = (score) => {
+  if (score >= 90) return { grade: 'A', color: '#22c55e' }
+  if (score >= 75) return { grade: 'B', color: '#84cc16' }
+  if (score >= 60) return { grade: 'C', color: '#eab308' }
+  if (score >= 40) return { grade: 'D', color: '#f97316' }
+  return               { grade: 'F', color: '#ef4444' }
+}
+
+export default function FileViewer({ files = [], issues = [] }) {
+  const [selectedFile, setSelectedFile] = useState(files[0] || null)
 
   const fileIssues = issues.filter(i => i.filename === selectedFile?.filename)
 
   const markers = fileIssues.map(issue => ({
-    startLineNumber: issue.line || 1,
-    endLineNumber: issue.line || 1,
-    startColumn: issue.column || 1,
-    endColumn: 100,
-    message: `[${issue.severity.toUpperCase()}] ${issue.message}`,
+    startLineNumber: issue.line   || 1,
+    endLineNumber:   issue.line   || 1,
+    startColumn:     issue.column || 1,
+    endColumn:       100,
+    message:  `[${issue.severity?.toUpperCase()}] ${issue.message}`,
     severity: issue.severity === 'critical' || issue.severity === 'high' ? 8 : 4,
   }))
 
@@ -22,36 +28,46 @@ export default function FileViewer({ files = mockReviewFiles, issues = [] }) {
     monaco.editor.setModelMarkers(editor.getModel(), 'codesense', markers)
   }
 
+  if (files.length === 0) return (
+    <div style={{
+      background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+      borderRadius: 10, display: 'flex', alignItems: 'center',
+      justifyContent: 'center', height: '100%', minHeight: 300,
+    }}>
+      <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No files to display</p>
+    </div>
+  )
+
   return (
     <div style={{
-      background: 'var(--bg-secondary)',
-      border: '1px solid var(--border)',
-      borderRadius: 10,
-      overflow: 'hidden',
-      display: 'flex',
+      background:    'var(--bg-secondary)',
+      border:        '1px solid var(--border)',
+      borderRadius:  10,
+      overflow:      'hidden',
+      display:       'flex',
       flexDirection: 'column',
-      height: '100%',
+      height:        '100%',
     }}>
       {/* ── File Tabs ───────────────────────────── */}
       <div style={{
-        display: 'flex',
-        overflowX: 'auto',
+        display:    'flex',
+        overflowX:  'auto',
         borderBottom: '1px solid var(--border)',
         background: 'var(--bg-primary)',
       }}>
         {files.map(file => {
           const isActive = selectedFile?._id === file._id
-          const grade = file.score ? getScoreGrade(file.score) : null
+          const grade    = file.score ? getScoreGrade(file.score) : null
           return (
             <button
               key={file._id}
               onClick={() => setSelectedFile(file)}
               style={{
-                padding: '10px 16px',
-                background: isActive ? 'var(--bg-secondary)' : 'transparent',
-                border: 'none',
+                padding:      '10px 16px',
+                background:   isActive ? 'var(--bg-secondary)' : 'transparent',
+                border:       'none',
                 borderBottom: isActive ? '2px solid var(--accent)' : '2px solid transparent',
-                color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                color:        isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                 fontSize: 12, fontWeight: isActive ? 500 : 400,
                 cursor: 'pointer', whiteSpace: 'nowrap',
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -59,13 +75,11 @@ export default function FileViewer({ files = mockReviewFiles, issues = [] }) {
               }}
             >
               <FileCode size={13} />
-              {file.filename.split('/').pop()}
+              {file.filename?.split('/').pop()}
               {grade && (
                 <span style={{
-                  fontSize: 10, fontWeight: 700,
-                  color: grade.color,
-                  background: `${grade.color}20`,
-                  padding: '1px 5px', borderRadius: 4,
+                  fontSize: 10, fontWeight: 700, color: grade.color,
+                  background: `${grade.color}20`, padding: '1px 5px', borderRadius: 4,
                 }}>
                   {file.score}
                 </span>
@@ -73,8 +87,7 @@ export default function FileViewer({ files = mockReviewFiles, issues = [] }) {
               {file.totalIssues > 0 && (
                 <span style={{
                   fontSize: 10,
-                  background: 'rgba(239,68,68,0.15)',
-                  color: 'var(--critical)',
+                  background: 'rgba(239,68,68,0.15)', color: 'var(--critical)',
                   padding: '1px 5px', borderRadius: 4,
                 }}>
                   {file.totalIssues}
@@ -87,8 +100,7 @@ export default function FileViewer({ files = mockReviewFiles, issues = [] }) {
 
       {/* ── File Info Bar ───────────────────────── */}
       <div style={{
-        padding: '6px 14px',
-        borderBottom: '1px solid var(--border)',
+        padding: '6px 14px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', gap: 12,
         background: 'var(--bg-tertiary)',
       }}>
@@ -110,20 +122,20 @@ export default function FileViewer({ files = mockReviewFiles, issues = [] }) {
         <Editor
           height="100%"
           language={selectedFile?.language || 'javascript'}
-          value={selectedFile?.content || '// No content available'}
+          value={selectedFile?.content    || '// No content available'}
           theme="vs-dark"
           onMount={handleEditorMount}
           options={{
-            readOnly: true,
-            fontSize: 13,
-            fontFamily: 'JetBrains Mono, monospace',
-            minimap: { enabled: false },
+            readOnly:             true,
+            fontSize:             13,
+            fontFamily:           'JetBrains Mono, monospace',
+            minimap:              { enabled: false },
             scrollBeyondLastLine: false,
-            lineNumbers: 'on',
-            renderLineHighlight: 'all',
-            folding: true,
-            wordWrap: 'on',
-            padding: { top: 10 },
+            lineNumbers:          'on',
+            renderLineHighlight:  'all',
+            folding:              true,
+            wordWrap:             'on',
+            padding:              { top: 10 },
           }}
         />
       </div>

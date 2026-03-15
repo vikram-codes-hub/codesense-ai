@@ -157,6 +157,18 @@ const isSupportedFile = (filename) => {
   const supported = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c']
   return supported.some(ext => filename.endsWith(ext))
 }
+const fetchUserRepos = async (token) => {
+  const client   = githubClient(token)
+  const response = await client.get('/user/repos?per_page=100&sort=updated')
+  return response.data.map(r => ({
+    id:        r.id,
+    name:      r.name,
+    fullName:  r.full_name,
+    language:  r.language,
+    isPrivate: r.private,
+    stars:     r.stargazers_count,
+  }))
+}
 
 module.exports = {
   fetchPRFiles,
@@ -166,4 +178,5 @@ module.exports = {
   addWebhook,
   removeWebhook,
   formatSummaryComment,
+  fetchUserRepos,
 }

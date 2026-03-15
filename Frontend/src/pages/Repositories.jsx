@@ -1,40 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { GitBranch, Plus, Search } from 'lucide-react'
-import { mockRepos } from '../utils/mockData'
-import RepoCard from '../components/Repostries/RepoCard'
+import { useRepo } from '../hooks/useRepo'
+import RepoCard         from '../components/Repostries/RepoCard'
 import ConnectRepoModal from '../components/Repostries/ConnectRepoModal'
-import toast from 'react-hot-toast'
 
 export default function Repositories() {
-  const [repos, setRepos] = useState(mockRepos)
-  const [search, setSearch] = useState('')
+  const {
+    repos, loading,
+    fetchRepos, connectRepo, disconnectRepo,
+  } = useRepo()
+
+  const [search,    setSearch]    = useState('')
   const [showModal, setShowModal] = useState(false)
 
+  useEffect(() => {
+    fetchRepos()
+  }, [])
+
   const filtered = repos.filter(r =>
-    r.repoName.toLowerCase().includes(search.toLowerCase()) ||
-    r.repoFullName.toLowerCase().includes(search.toLowerCase())
+    r.repoName?.toLowerCase().includes(search.toLowerCase()) ||
+    r.repoFullName?.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleDisconnect = (repoId) => {
-    setRepos(repos.filter(r => r._id !== repoId))
-    toast.success('Repository disconnected')
+  const handleDisconnect = async (repoId) => {
+    await disconnectRepo(repoId)
   }
 
-  const handleConnect = (githubRepo) => {
-    const newRepo = {
-      _id: `repo_${Date.now()}`,
-      repoName: githubRepo.name,
+  const handleConnect = async (githubRepo) => {
+    await connectRepo({
+      repoName:     githubRepo.name,
       repoFullName: githubRepo.fullName,
       githubRepoId: githubRepo.id,
-      isConnected: true,
-      avgScore: null,
-      language: githubRepo.language,
-      lastReviewAt: null,
-    }
-    setRepos([newRepo, ...repos])
+      language:     githubRepo.language || 'Unknown',
+    })
+    setShowModal(false)
   }
-
-  const connectedIds = repos.map(r => r.githubRepoId)
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -46,7 +46,7 @@ export default function Repositories() {
             Repositories
           </h2>
           <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-            {repos.filter(r => r.isConnected).length} connected · {repos.length} total
+            {repos.length} connected
           </p>
         </div>
         <button
@@ -72,13 +72,17 @@ export default function Repositories() {
       </div>
 
       {/* ── Grid ──────────────────────────────────── */}
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '60px 0' }}>
+          <div className="spinner" />
+        </div>
+      ) : filtered.length === 0 ? (
         <div style={{
           textAlign: 'center', padding: '60px 0',
           color: 'var(--text-muted)', fontSize: 14,
         }}>
           <GitBranch size={40} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
-          <p>No repositories found</p>
+          <p>{repos.length === 0 ? 'No repositories connected yet' : 'No repositories found'}</p>
         </div>
       ) : (
         <div style={{
@@ -101,7 +105,7 @@ export default function Repositories() {
         <ConnectRepoModal
           onClose={() => setShowModal(false)}
           onConnect={handleConnect}
-          alreadyConnected={connectedIds}
+          alreadyConnected={repos.map(r => r.githubRepoId)}
         />
       )}
     </div>

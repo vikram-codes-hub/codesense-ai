@@ -1,19 +1,18 @@
 import { useState } from 'react'
-import { mockRepos } from '../utils/mockData'
+import api from '../utils/axios'
 import toast from 'react-hot-toast'
-// import api from '../utils/axios'
 
 export const useRepo = () => {
-  const [repos, setRepos]     = useState(mockRepos)
-  const [loading, setLoading] = useState(false)
+  const [repos,          setRepos]   = useState([])
+  const [githubRepos,    setGithubRepos] = useState([])
+  const [loading,        setLoading] = useState(false)
+  const [githubLoading,  setGithubLoading] = useState(false)
 
   const fetchRepos = async () => {
     setLoading(true)
     try {
-      // TODO: const { data } = await api.get('/api/repos')
-      // setRepos(data.data)
-      await new Promise(r => setTimeout(r, 500))
-      setRepos(mockRepos)
+      const { data } = await api.get('/api/repos')
+      setRepos(data.data.repos)
     } catch (err) {
       toast.error('Failed to fetch repositories')
     } finally {
@@ -21,20 +20,33 @@ export const useRepo = () => {
     }
   }
 
-  const connectRepo = async (repoFullName) => {
+  const fetchGithubRepos = async () => {
+    setGithubLoading(true)
     try {
-      // TODO: const { data } = await api.post('/api/repos/connect', { repoFullName })
-      // setRepos(prev => [...prev, data.data])
-      toast.success(`Connected ${repoFullName}!`)
+      const { data } = await api.get('/api/repos/github')
+      setGithubRepos(data.data.repos)
     } catch (err) {
-      toast.error('Failed to connect repository')
+      toast.error('Failed to fetch GitHub repositories')
+    } finally {
+      setGithubLoading(false)
+    }
+  }
+
+  const connectRepo = async (repoData) => {
+    try {
+      const { data } = await api.post('/api/repos/connect', repoData)
+      setRepos(prev => [...prev, data.data.repo])
+      toast.success(`Connected ${repoData.repoFullName}!`)
+      return data.data.repo
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to connect repository')
       throw err
     }
   }
 
   const disconnectRepo = async (repoId) => {
     try {
-      // TODO: await api.delete(`/api/repos/${repoId}`)
+      await api.delete(`/api/repos/${repoId}`)
       setRepos(prev => prev.filter(r => r._id !== repoId))
       toast.success('Repository disconnected')
     } catch (err) {
@@ -43,5 +55,14 @@ export const useRepo = () => {
     }
   }
 
-  return { repos, loading, fetchRepos, connectRepo, disconnectRepo }
+  return {
+    repos,
+    githubRepos,
+    loading,
+    githubLoading,
+    fetchRepos,
+    fetchGithubRepos,
+    connectRepo,
+    disconnectRepo,
+  }
 }

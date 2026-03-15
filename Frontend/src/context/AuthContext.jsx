@@ -1,32 +1,39 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { mockUser } from '../utils/mockData'
+import api from '../utils/axios'
 
 const AuthContext = createContext({
-  user: null,
-  token: null,
+  user:            null,
+  token:           null,
   isAuthenticated: false,
-  loading: false,
-  login: () => {},
-  logout: () => {},
-  setUser: () => {},
+  loading:         true,
+  login:           () => {},
+  logout:          () => {},
+  setUser:         () => {},
 })
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
+  const [user,            setUser]            = useState(null)
+  const [token,           setToken]           = useState(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [loading,         setLoading]         = useState(true)
 
   useEffect(() => {
-    // ── Load from localStorage on mount ──────────
     const savedToken = localStorage.getItem('token')
     if (savedToken) {
-      // TODO: swap with real API call later
-      setUser(mockUser)
       setToken(savedToken)
-      setIsAuthenticated(true)
+      api.get('/api/auth/me')
+        .then(({ data }) => {
+          setUser(data.data)
+          setIsAuthenticated(true)
+        })
+        .catch(() => {
+
+          localStorage.removeItem('token')
+        })
+        .finally(() => setLoading(false))
+    } else {
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   const login = (userData, tokenData) => {

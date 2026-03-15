@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { mockReviews, mockReviewFiles, mockIssues } from '../utils/mockData'
+import { useReview }  from '../hooks/useReview'
+import { useSocket }  from '../hooks/useSocket'
 import ScoreCard from '../components/review/ScoreCard'
 import IssueList from '../components/review/IssueList'
 import LiveFeed  from '../components/review/LiveFeed'
@@ -32,45 +32,100 @@ function processUserData(req, res) {
   }
 }`
 
-const MOCK_LIVE_EVENTS = [
-  { id: 1, event: 'review:queued',    message: 'Manual review queued',              time: '00:00:01' },
-  { id: 2, event: 'review:started',   message: 'Analysis started — 1 file',         time: '00:00:02' },
-  { id: 3, event: 'review:file:done', message: 'code.js — Score: 42 — 5 issues',    time: '00:00:04' },
-  { id: 4, event: 'review:complete',  message: 'Complete — Overall Score: 42',       time: '00:00:05' },
-]
-
 export default function ManualReview() {
-  const navigate = useNavigate()
-  const [code, setCode] = useState('')
-  const [language, setLanguage] = useState('javascript')
-  const [loading, setLoading] = useState(false)
-  const [analyzed, setAnalyzed] = useState(false)
+  const { submitManualReview, liveUpdates, currentReview } = useReview()
+  const { socket } = useSocket()
+
+  const [code,      setCode]      = useState('')
+  const [language,  setLanguage]  = useState('javascript')
+  const [loading,   setLoading]   = useState(false)
+  const [analyzed,  setAnalyzed]  = useState(false)
+  const [reviewId,  setReviewId]  = useState(null)
+  const [result,    setResult]    = useState(null)
+  const [issues,    setIssues]    = useState([])
   const [liveEvents, setLiveEvents] = useState([])
+
+  // ── Listen to socket events for this review ───────────
+  const addEvent = (event, message) => {
+    setLiveEvents(prev => [...prev, {
+      id:      Date.now(),
+      event,
+      message,
+      time:    new Date().toLocaleTimeString(),
+    }])
+  }
 
   const handleAnalyze = async () => {
     if (!code.trim()) { toast.error('Please paste some code first'); return }
+
     setLoading(true)
     setAnalyzed(false)
     setLiveEvents([])
+    setResult(null)
+    setIssues([])
 
-    // Simulate live feed events one by one
-    for (let i = 0; i < MOCK_LIVE_EVENTS.length; i++) {
-      await new Promise(r => setTimeout(r, 800))
-      setLiveEvents(prev => [...prev, MOCK_LIVE_EVENTS[i]])
+    try {
+      addEvent('review:queued', 'Manual review queued')
+
+      const data = await submitManualReview(
+        code,
+        language,
+        `code.${language === 'python' ? 'py' : language === 'typescript' ? 'ts' : 'js'}`
+      )
+
+      setReviewId(data.reviewId)
+      addEvent('review:started', 'Analysis started — 1 file')
+
+      // ── Poll for completion via socket ────────────────
+      if (socket) {
+        socket.emit('subscribe:review', { reviewId: data.reviewId })
+
+        socket.once('review:file:done', (d) => {
+          addEvent('review:file:done', `File analyzed — Score: ${d.fileScore} — ${d.issuesFound} issues`)
+        })
+
+        socket.once('review:complete', async (d) => {
+          addEvent('review:complete', `Complete — Score: ${d.overallScore}/100 | ${d.totalIssues} issues`)
+          setResult(d)
+          setAnalyzed(true)
+          setLoading(false)
+          toast.success('Analysis complete!')
+
+          // Fetch full review details
+          try {
+            const { default: api } = await import('../utils/axios')
+            const [reviewRes, filesRes] = await Promise.all([
+              api.get(`/api/reviews/${d.reviewId}`),
+              api.get(`/api/reviews/${d.reviewId}/files`),
+            ])
+            setResult(reviewRes.data.data.review)
+            setIssues(reviewRes.data.data.issues || [])
+          } catch (e) {
+            console.error('Failed to fetch review details:', e)
+          }
+        })
+
+        socket.once('review:failed', (d) => {
+          addEvent('review:failed', `Failed: ${d.error}`)
+          toast.error('Analysis failed')
+          setLoading(false)
+        })
+      }
+
+    } catch (err) {
+      setLoading(false)
+      // error handled in hook
     }
-
-    setLoading(false)
-    setAnalyzed(true)
-    toast.success('Analysis complete!')
   }
 
   const handleReset = () => {
     setCode('')
     setAnalyzed(false)
     setLiveEvents([])
+    setResult(null)
+    setIssues([])
+    setReviewId(null)
   }
-
-  const mockReview = mockReviews[1] // use a review with low score for demo
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
@@ -140,7 +195,8 @@ export default function ManualReview() {
               {/* Actions */}
               <div style={{ display: 'flex', gap: 6 }}>
                 {analyzed && (
-                  <button onClick={handleReset} className="btn-secondary" style={{ padding: '5px 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button onClick={handleReset} className="btn-secondary"
+                    style={{ padding: '5px 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <RotateCcw size={12} /> Reset
                   </button>
                 )}
@@ -199,9 +255,9 @@ export default function ManualReview() {
           </div>
 
           {/* Issues — shown after analysis */}
-          {analyzed && (
-            <div style={{ height: 400, animation: 'slideUp 0.3s ease-out' }}>
-              <IssueList issues={mockIssues} />
+          {analyzed && issues.length > 0 && (
+            <div style={{ animation: 'slideUp 0.3s ease-out' }}>
+              <IssueList issues={issues} />
             </div>
           )}
         </div>
@@ -209,17 +265,14 @@ export default function ManualReview() {
         {/* ── Right ───────────────────────────────── */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 0 }}>
 
-          {/* Live Feed — always visible */}
           <LiveFeed events={liveEvents} />
 
-          {/* Score — shown after analysis */}
-          {analyzed && (
+          {analyzed && result && (
             <div style={{ animation: 'slideUp 0.3s ease-out' }}>
-              <ScoreCard review={mockReview} />
+              <ScoreCard review={result} />
             </div>
           )}
 
-          {/* Placeholder before analysis */}
           {!analyzed && !loading && (
             <div style={{
               background: 'var(--bg-secondary)',

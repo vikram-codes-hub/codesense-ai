@@ -1,11 +1,23 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { GitBranch, Clock, Trash2, ExternalLink, Circle } from 'lucide-react'
-import { getScoreGrade, formatDate } from '../../utils/mockData'
+
+const getScoreGrade = (score) => {
+  if (score >= 90) return { grade: 'A', color: '#22c55e' }
+  if (score >= 75) return { grade: 'B', color: '#84cc16' }
+  if (score >= 60) return { grade: 'C', color: '#eab308' }
+  if (score >= 40) return { grade: 'D', color: '#f97316' }
+  return               { grade: 'F', color: '#ef4444' }
+}
+
+const formatDate = (date) => {
+  if (!date) return null
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 export default function RepoCard({ repo, onDisconnect }) {
-  const navigate = useNavigate()
-  const [hovering, setHovering] = useState(false)
+  const navigate  = useNavigate()
+  const [hovering,   setHovering]   = useState(false)
   const [confirming, setConfirming] = useState(false)
 
   const grade = repo.avgScore ? getScoreGrade(repo.avgScore) : null
@@ -27,14 +39,14 @@ export default function RepoCard({ repo, onDisconnect }) {
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => { setHovering(false); setConfirming(false) }}
       style={{
-        background: 'var(--bg-secondary)',
-        border: `1px solid ${hovering ? 'var(--accent)' : 'var(--border)'}`,
+        background:  'var(--bg-secondary)',
+        border:      `1px solid ${hovering ? 'var(--accent)' : 'var(--border)'}`,
         borderRadius: 10,
-        padding: 20,
-        cursor: 'pointer',
-        transition: 'all 0.2s',
-        boxShadow: hovering ? '0 0 16px var(--accent-glow)' : 'none',
-        animation: 'slideUp 0.3s ease-out',
+        padding:     20,
+        cursor:      'pointer',
+        transition:  'all 0.2s',
+        boxShadow:   hovering ? '0 0 16px var(--accent-glow)' : 'none',
+        animation:   'slideUp 0.3s ease-out',
       }}
       onClick={() => navigate('/repositories')}
     >
@@ -43,8 +55,7 @@ export default function RepoCard({ repo, onDisconnect }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 8,
-            background: 'var(--bg-tertiary)',
-            border: '1px solid var(--border)',
+            background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             <GitBranch size={18} color="var(--accent)" />
@@ -59,7 +70,6 @@ export default function RepoCard({ repo, onDisconnect }) {
           </div>
         </div>
 
-        {/* Score badge */}
         {grade && (
           <div style={{
             padding: '4px 10px', borderRadius: 8,
@@ -67,12 +77,8 @@ export default function RepoCard({ repo, onDisconnect }) {
             border: `1px solid ${grade.color}40`,
             display: 'flex', alignItems: 'center', gap: 5,
           }}>
-            <span style={{ fontSize: 16, fontWeight: 700, color: grade.color }}>
-              {repo.avgScore}
-            </span>
-            <span style={{ fontSize: 11, color: grade.color, fontWeight: 600 }}>
-              {grade.grade}
-            </span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: grade.color }}>{repo.avgScore}</span>
+            <span style={{ fontSize: 11, color: grade.color, fontWeight: 600 }}>{grade.grade}</span>
           </div>
         )}
       </div>
@@ -88,9 +94,7 @@ export default function RepoCard({ repo, onDisconnect }) {
         {repo.lastReviewAt && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <Clock size={12} color="var(--text-muted)" />
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {formatDate(repo.lastReviewAt)}
-            </span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{formatDate(repo.lastReviewAt)}</span>
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -106,11 +110,9 @@ export default function RepoCard({ repo, onDisconnect }) {
 
       {/* ── Actions ─────────────────────────────── */}
       <div style={{ display: 'flex', gap: 8 }}>
-        {/* View on GitHub */}
-        
-          <a href={`https://github.com/${repo.repoFullName}`}
-          target="_blank"
-          rel="noreferrer"
+        <a
+          href={`https://github.com/${repo.repoFullName}`}
+          target="_blank" rel="noreferrer"
           onClick={e => e.stopPropagation()}
           style={{
             flex: 1, padding: '7px 0', borderRadius: 7,
@@ -125,7 +127,6 @@ export default function RepoCard({ repo, onDisconnect }) {
           <ExternalLink size={13} /> View on GitHub
         </a>
 
-        {/* Disconnect */}
         {!confirming ? (
           <button
             onClick={handleDisconnect}

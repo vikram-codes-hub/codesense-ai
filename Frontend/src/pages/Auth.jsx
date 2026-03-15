@@ -1,21 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { mockUser } from '../utils/mockData'
+import { useAuth } from '../hooks/useAuth'
 import { Zap, Eye, EyeOff, Github } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Auth() {
-  const { login } = useAuth()
+  const { loginUser, registerUser, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
-  const [mode, setMode] = useState('login') // 'login' | 'register'
+  const [mode,         setMode]         = useState('login')
   const [showPassword, setShowPassword] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' })
+  const [showConfirm,  setShowConfirm]  = useState(false)
+  const [loading,      setLoading]      = useState(false)
+  const [form,         setForm]         = useState({ name: '', email: '', password: '', confirmPassword: '' })
 
   const isLogin = mode === 'login'
+
+  // ── Handle GitHub OAuth callback token ────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token  = params.get('token')
+    const error  = params.get('error')
+
+    if (token) {
+      localStorage.setItem('token', token)
+      window.location.href = '/dashboard'
+    }
+    if (error) {
+      toast.error('GitHub login failed. Please try again.')
+    }
+  }, [])
+
+  // ── Redirect if already authenticated ─────────────────
+  useEffect(() => {
+    if (isAuthenticated) navigate('/dashboard')
+  }, [isAuthenticated])
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -23,28 +42,27 @@ export default function Auth() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.email || !form.password) { toast.error('Please fill in all fields'); return }
-    if (!isLogin && !form.name) { toast.error('Please enter your name'); return }
-    if (!isLogin && form.password.length < 6) { toast.error('Password must be at least 6 characters'); return }
-    if (!isLogin && form.password !== form.confirmPassword) { toast.error('Passwords do not match'); return }
+    if (!form.email || !form.password)                                    { toast.error('Please fill in all fields');              return }
+    if (!isLogin && !form.name)                                           { toast.error('Please enter your name');                 return }
+    if (!isLogin && form.password.length < 6)                            { toast.error('Password must be at least 6 characters'); return }
+    if (!isLogin && form.password !== form.confirmPassword)              { toast.error('Passwords do not match');                 return }
 
     setLoading(true)
     try {
-      await new Promise(r => setTimeout(r, 800))
-      login(mockUser, 'mock_token_123')
-      toast.success(isLogin ? 'Welcome back!' : 'Account created!')
-      navigate('/dashboard')
+      if (isLogin) {
+        await loginUser(form.email, form.password)
+      } else {
+        await registerUser(form.name, form.email, form.password)
+      }
     } catch (err) {
-      toast.error(isLogin ? 'Invalid credentials' : 'Registration failed')
+      // errors handled in hook
     } finally {
       setLoading(false)
     }
   }
 
   const handleGitHub = () => {
-    login(mockUser, 'mock_token_123')
-    toast.success('Logged in with GitHub!')
-    navigate('/dashboard')
+    window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/github`
   }
 
   const switchMode = (newMode) => {
@@ -56,20 +74,20 @@ export default function Auth() {
 
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'var(--bg-primary)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
+      minHeight:       '100vh',
+      background:      'var(--bg-primary)',
+      display:         'flex',
+      alignItems:      'center',
+      justifyContent:  'center',
+      padding:         24,
     }}>
 
       {/* Background grid */}
       <div style={{
-        position: 'fixed', inset: 0,
-        backgroundImage: 'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
-        backgroundSize: '32px 32px',
-        pointerEvents: 'none',
+        position:            'fixed', inset: 0,
+        backgroundImage:     'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
+        backgroundSize:      '32px 32px',
+        pointerEvents:       'none',
       }} />
 
       <div style={{ width: '100%', maxWidth: 420, animation: 'slideUp 0.4s ease-out' }}>
@@ -95,11 +113,11 @@ export default function Auth() {
 
         {/* ── Toggle tabs ───────────────────────── */}
         <div style={{
-          display: 'flex',
-          background: 'var(--bg-secondary)',
-          border: '1px solid var(--border)',
+          display:      'flex',
+          background:   'var(--bg-secondary)',
+          border:       '1px solid var(--border)',
           borderRadius: 10,
-          padding: 4,
+          padding:      4,
           marginBottom: 20,
         }}>
           {['login', 'register'].map((m) => (
@@ -107,17 +125,17 @@ export default function Auth() {
               key={m}
               onClick={() => switchMode(m)}
               style={{
-                flex: 1,
-                padding: '8px 0',
+                flex:         1,
+                padding:      '8px 0',
                 borderRadius: 7,
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 14,
-                fontWeight: 500,
-                transition: 'all 0.2s',
-                background: mode === m ? 'var(--accent)' : 'transparent',
-                color: mode === m ? 'white' : 'var(--text-secondary)',
-                boxShadow: mode === m ? '0 0 10px var(--accent-glow)' : 'none',
+                border:       'none',
+                cursor:       'pointer',
+                fontSize:     14,
+                fontWeight:   500,
+                transition:   'all 0.2s',
+                background:   mode === m ? 'var(--accent)' : 'transparent',
+                color:        mode === m ? 'white' : 'var(--text-secondary)',
+                boxShadow:    mode === m ? '0 0 10px var(--accent-glow)' : 'none',
               }}
             >
               {m === 'login' ? 'Sign In' : 'Sign Up'}
@@ -247,15 +265,17 @@ export default function Auth() {
               className="btn-primary"
               disabled={loading}
               style={{
-                width: '100%', padding: '10px 16px', fontSize: 14,
+                width:     '100%',
+                padding:   '10px 16px',
+                fontSize:  14,
                 marginTop: isLogin ? 6 : 0,
-                opacity: loading ? 0.7 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity:   loading ? 0.7 : 1,
+                cursor:    loading ? 'not-allowed' : 'pointer',
               }}
             >
               {loading
                 ? (isLogin ? 'Signing in...' : 'Creating account...')
-                : (isLogin ? 'Sign In' : 'Create Account')
+                : (isLogin ? 'Sign In'        : 'Create Account')
               }
             </button>
           </form>

@@ -1,8 +1,7 @@
 import { useState } from 'react'
-import { mockReviews, mockReviewFiles, mockIssues } from '../utils/mockData'
+import api from '../utils/axios'
 import useReviewStore from '../store/reviewStore'
 import toast from 'react-hot-toast'
-// import api from '../utils/axios'
 
 export const useReview = () => {
   const {
@@ -11,13 +10,15 @@ export const useReview = () => {
     addLiveUpdate, clearLiveUpdates, updateReviewStatus,
   } = useReviewStore()
 
-  const fetchReviews = async () => {
+  const [reviewFiles, setReviewFiles] = useState([])
+  const [filesLoading, setFilesLoading] = useState(false)
+
+  const fetchReviews = async (params = {}) => {
     setLoading(true)
     try {
-      // TODO: const { data } = await api.get('/api/reviews')
-      // setReviews(data.data)
-      await new Promise(r => setTimeout(r, 500))
-      setReviews(mockReviews)
+      const { data } = await api.get('/api/reviews', { params })
+      setReviews(data.data.reviews)
+      return data.data
     } catch (err) {
       toast.error('Failed to fetch reviews')
     } finally {
@@ -28,11 +29,9 @@ export const useReview = () => {
   const fetchReview = async (id) => {
     setLoading(true)
     try {
-      // TODO: const { data } = await api.get(`/api/reviews/${id}`)
-      // setCurrentReview(data.data)
-      await new Promise(r => setTimeout(r, 300))
-      const review = mockReviews.find(r => r._id === id) || mockReviews[0]
-      setCurrentReview(review)
+      const { data } = await api.get(`/api/reviews/${id}`)
+      setCurrentReview(data.data)
+      return data.data
     } catch (err) {
       toast.error('Failed to fetch review')
     } finally {
@@ -41,23 +40,57 @@ export const useReview = () => {
   }
 
   const fetchReviewFiles = async (reviewId) => {
+    setFilesLoading(true)
     try {
-      // TODO: const { data } = await api.get(`/api/reviews/${reviewId}/files`)
-      return mockReviewFiles.filter(f => f.reviewId === reviewId)
+      const { data } = await api.get(`/api/reviews/${reviewId}/files`)
+      setReviewFiles(data.data.files)
+      return data.data.files
     } catch (err) {
       toast.error('Failed to fetch files')
       return []
+    } finally {
+      setFilesLoading(false)
+    }
+  }
+
+  const submitManualReview = async (code, language, filename) => {
+    try {
+      const { data } = await api.post('/api/reviews/manual', {
+        code,
+        language,
+        filename,
+      })
+      toast.success('Review queued!')
+      return data.data
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to submit review')
+      throw err
+    }
+  }
+
+  const deleteReview = async (reviewId) => {
+    try {
+      await api.delete(`/api/reviews/${reviewId}`)
+      setReviews(prev => prev.filter(r => r._id !== reviewId))
+      toast.success('Review deleted')
+    } catch (err) {
+      toast.error('Failed to delete review')
+      throw err
     }
   }
 
   return {
     reviews,
     currentReview,
+    reviewFiles,
     liveUpdates,
     loading,
+    filesLoading,
     fetchReviews,
     fetchReview,
     fetchReviewFiles,
+    submitManualReview,
+    deleteReview,
     addLiveUpdate,
     clearLiveUpdates,
     updateReviewStatus,

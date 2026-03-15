@@ -4,15 +4,13 @@ import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
 export const useAuth = () => {
-  const context = useAuthContext()
+  const context  = useAuthContext()
   const navigate = useNavigate()
 
   const loginUser = async (email, password) => {
     try {
-      // TODO: swap with real API
-      // const { data } = await api.post('/api/auth/login', { email, password })
-      // context.login(data.data.user, data.data.token)
-      context.login({ email }, 'mock_token')
+      const { data } = await api.post('/api/auth/login', { email, password })
+      context.login(data.data.user, data.data.token)
       toast.success('Welcome back!')
       navigate('/dashboard')
     } catch (err) {
@@ -23,10 +21,8 @@ export const useAuth = () => {
 
   const registerUser = async (name, email, password) => {
     try {
-      // TODO: swap with real API
-      // const { data } = await api.post('/api/auth/register', { name, email, password })
-      // context.login(data.data.user, data.data.token)
-      context.login({ name, email }, 'mock_token')
+      const { data } = await api.post('/api/auth/register', { name, email, password })
+      context.login(data.data.user, data.data.token)
       toast.success('Account created!')
       navigate('/dashboard')
     } catch (err) {
@@ -37,10 +33,9 @@ export const useAuth = () => {
 
   const logoutUser = async () => {
     try {
-      // TODO: await api.post('/api/auth/logout')
-      context.logout()
-      navigate('/auth')
+      await api.post('/api/auth/logout')
     } catch (err) {
+    } finally {
       context.logout()
       navigate('/auth')
     }

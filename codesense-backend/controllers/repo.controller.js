@@ -1,6 +1,10 @@
 const Repository        = require("../models/Repository");
 const Review            = require("../models/Review");
 const { success, error }= require("../utils/response.utils");
+const User              = require("../models/User");
+const { fetchUserRepos } = require('../services/github.service')
+
+
 
 /* ── Get All Connected Repos ──────────────────────────────
    GET /api/repos
@@ -19,10 +23,11 @@ const getRepos = async (req, res, next) => {
 ──────────────────────────────────────────────────────────── */
 const getGithubRepos = async (req, res, next) => {
   try {
-    // TODO: call github.service.js → getUserRepos(req.user.githubToken)
-    return success(res, 200, "GitHub repos fetched", { repos: [] });
-  } catch (err) { next(err); }
-};
+    const user  = await User.findById(req.user._id).select('+githubToken')
+    const repos = await fetchUserRepos(user.githubToken)
+    return success(res, 200, 'GitHub repos fetched', { repos })
+  } catch (err) { next(err) }
+}
 
 /* ── Connect Repo ─────────────────────────────────────────
    POST /api/repos/connect

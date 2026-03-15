@@ -1,8 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import {
-  mockDashboardStats,
-  mockRepos,
-} from '../utils/mockData'
+import api from '../utils/axios'
 import StatsWidget   from '../components/dashboard/StatsWidget'
 import ActivityChart from '../components/dashboard/ActivityChart'
 import RecentReviews from '../components/dashboard/RecentReviews'
@@ -14,7 +12,37 @@ import {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const stats = mockDashboardStats
+
+  const [stats,   setStats]   = useState(null)
+  const [recent,  setRecent]  = useState([])
+  const [repos,   setRepos]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchAll = async () => {
+      try {
+        const [statsRes, recentRes, reposRes] = await Promise.all([
+          api.get('/api/dashboard/stats'),
+          api.get('/api/dashboard/recent'),
+          api.get('/api/repos'),
+        ])
+        setStats(statsRes.data.data.stats)
+        setRecent(recentRes.data.data.reviews)
+        setRepos(reposRes.data.data.repos)
+      } catch (err) {
+        console.error('Dashboard fetch error:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchAll()
+  }, [])
+
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
+      <div className="spinner" />
+    </div>
+  )
 
   return (
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -37,31 +65,28 @@ export default function Dashboard() {
       }}>
         <StatsWidget
           title="Total Reviews"
-          value={stats.totalReviews}
-          subtitle={`${stats.reviewsThisWeek} this week`}
+          value={stats?.totalReviews ?? 0}
+          subtitle={`${stats?.completedReviews ?? 0} completed`}
           icon={GitPullRequest}
           iconColor="#6366f1"
-          change={stats.reviewsThisWeek}
         />
         <StatsWidget
           title="Average Score"
-          value={`${stats.avgScore}`}
+          value={stats?.avgScore ?? '—'}
           subtitle="Across all repos"
           icon={BarChart2}
           iconColor="#22c55e"
-          change={stats.scoreChange}
         />
         <StatsWidget
           title="Total Issues"
-          value={stats.totalIssues}
+          value={stats?.totalIssues ?? 0}
           subtitle="All time"
           icon={AlertTriangle}
           iconColor="#eab308"
-          change={stats.issuesChange}
         />
         <StatsWidget
           title="Critical Issues"
-          value={stats.criticalIssues}
+          value={stats?.criticalIssues ?? 0}
           subtitle="Needs attention"
           icon={Shield}
           iconColor="#ef4444"
@@ -75,7 +100,7 @@ export default function Dashboard() {
         gap: 16, marginBottom: 24,
       }}>
         <ActivityChart />
-        <RecentReviews />
+        <RecentReviews reviews={recent} />
       </div>
 
       {/* ── Connected Repos ─────────────────────────── */}
@@ -91,19 +116,29 @@ export default function Dashboard() {
             </span>
           </div>
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-            {mockRepos.filter(r => r.isConnected).length} connected
+            {repos.length} connected
           </span>
         </div>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 14,
-        }}>
-          {mockRepos.map(repo => (
-            <RepoCard key={repo._id} repo={repo} />
-          ))}
-        </div>
+        {repos.length === 0 ? (
+          <div style={{
+            textAlign: 'center', padding: '40px 0',
+            color: 'var(--text-muted)', fontSize: 14,
+          }}>
+            <GitBranch size={36} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+            <p>No repositories connected yet</p>
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            gap: 14,
+          }}>
+            {repos.map(repo => (
+              <RepoCard key={repo._id} repo={repo} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

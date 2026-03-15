@@ -33,9 +33,9 @@ export default function App() {
         toastOptions={{
           style: {
             background: '#161b22',
-            color: '#e6edf3',
-            border: '1px solid #30363d',
-            fontSize: '14px',
+            color:      '#e6edf3',
+            border:     '1px solid #30363d',
+            fontSize:   '14px',
           },
           success: { iconTheme: { primary: '#22c55e', secondary: '#161b22' } },
           error:   { iconTheme: { primary: '#ef4444', secondary: '#161b22' } },
@@ -50,7 +50,7 @@ export default function App() {
 
         {/* ── Protected ───────────────────────── */}
         <Route path="/" element={
-          <PublicRoute><Layout /></PublicRoute>
+          <ProtectedRoute><Layout /></ProtectedRoute>
         }>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard"      element={<Dashboard />} />

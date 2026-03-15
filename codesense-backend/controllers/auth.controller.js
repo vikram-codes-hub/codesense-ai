@@ -1,6 +1,6 @@
 const User              = require('../models/User')
 const { generateToken } = require('../utils/jwt.utils')
-const { success, error }= require('../utils/response.utils')
+const { success, error } = require('../utils/response.utils')
 const redis             = require('../config/redis')
 const logger            = require('../utils/logger')
 
@@ -115,4 +115,29 @@ const githubCallback = async (req, res) => {
   }
 }
 
-module.exports = { register, login, getMe, logout, githubCallback }
+
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name, email } = req.body
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name, email },
+      { new: true }
+    )
+    return success(res, 200, 'Profile updated', { name: user.name, email: user.email })
+  } catch (err) { next(err) }
+}
+
+const updatePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body
+    const user = await User.findById(req.user._id).select('+password')
+    const isMatch = await user.comparePassword(currentPassword)
+    if (!isMatch) return error(res, 401, 'Current password is incorrect')
+    user.password = newPassword
+    await user.save()
+    return success(res, 200, 'Password updated')
+  } catch (err) { next(err) }
+}
+
+module.exports = { register, login, getMe, logout, githubCallback, updateProfile, updatePassword }
