@@ -1,182 +1,133 @@
-const axios  = require('axios')
-const logger = require('../utils/logger')
+const crypto     = require('crypto')
+const Repository = require('../models/Repository')
+const Review     = require('../models/Review')
+const User       = require('../models/User')
+const { addReviewJob }    = require('../queues/review.queue')
+const { emitReviewQueued } = require('../socket')
+const logger     = require('../utils/logger')
 
-const GITHUB_API = 'https://api.github.com'
-const TOKEN      = process.env.GITHUB_TOKEN
-
-const githubClient = (token = TOKEN) => axios.create({
-  baseURL: GITHUB_API,
-  headers: {
-    Authorization: `Bearer ${token}`,
-    Accept:        'application/vnd.github.v3+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  },
-})
-
-// ── Fetch PR Files ─────────────────────────────────────────
-const fetchPRFiles = async (repoFullName, prNumber, token) => {
+// ── Verify GitHub Webhook Signature ───────────────────────
+const verifySignature = (body, signature) => {
+  if (!signature) return false
   try {
-    const client   = githubClient(token)
-    const response = await client.get(
-      `/repos/${repoFullName}/pulls/${prNumber}/files`
-    )
-
-    return response.data
-      .filter(f => f.status !== 'removed')
-      .filter(f => isSupportedFile(f.filename))
-      .map(f => ({
-        filename:  f.filename,
-        patch:     f.patch || '',
-        additions: f.additions,
-        deletions: f.deletions,
-        raw_url:   f.raw_url,
-      }))
-
+    const hmac      = crypto.createHmac('sha256', process.env.GITHUB_WEBHOOK_SECRET)
+    const digest    = 'sha256=' + hmac.update(body).digest('hex')
+    const sigBuffer = Buffer.from(signature)
+    const digBuffer = Buffer.from(digest)
+    if (sigBuffer.length !== digBuffer.length) return false
+    return crypto.timingSafeEqual(sigBuffer, digBuffer)
   } catch (err) {
-    logger.error(`fetchPRFiles error: ${err.message}`)
-    throw err
+    logger.error(`Signature verification error: ${err.message}`)
+    return false
   }
 }
 
-// ── Fetch File Content ─────────────────────────────────────
-const fetchFileContent = async (rawUrl, token) => {
+// ── Process PR Event ───────────────────────────────────────
+const processPREvent = async (payload) => {
   try {
-    const response = await axios.get(rawUrl, {
-      headers: { Authorization: `Bearer ${token || TOKEN}` },
+    // Lazy require to avoid circular dependency
+    const { fetchPRFiles, fetchFileContent } = require('./github.service')
+
+    const { pull_request, repository, action } = payload
+
+    const githubRepoId = repository.id.toString()
+    const prNumber     = pull_request.number
+    const prTitle      = pull_request.title
+    const prUrl        = pull_request.html_url
+    const commitSha    = pull_request.head.sha
+    const branch       = pull_request.head.ref
+
+    logger.info(`PR event: ${action} #${prNumber} in ${repository.full_name}`)
+
+    // ── Find repo in our DB ──────────────────────
+    const repo = await Repository.findOne({ githubRepoId })
+    if (!repo) {
+      logger.warn(`Repo not found in DB: ${githubRepoId}`)
+      return
+    }
+
+    // ── Check for duplicate review ───────────────
+    const existing = await Review.findOne({
+      repoId:    repo._id,
+      prNumber,
+      commitSha,
+      status:    { $in: ['pending', 'running'] },
     })
-    return response.data
-  } catch (err) {
-    logger.error(`fetchFileContent error: ${err.message}`)
-    return ''
-  }
-}
+    if (existing) {
+      logger.warn(`Duplicate review skipped: PR #${prNumber}`)
+      return
+    }
 
-// ── Post Inline Comment ────────────────────────────────────
-const postInlineComment = async (repoFullName, prNumber, commitSha, filename, line, body, token) => {
-  try {
-    const client = githubClient(token)
-    await client.post(
-      `/repos/${repoFullName}/pulls/${prNumber}/comments`,
-      {
-        body,
-        commit_id: commitSha,
-        path:      filename,
-        line,
-        side:      'RIGHT',
-      }
-    )
-    logger.info(`Comment posted: ${filename}:${line}`)
-  } catch (err) {
-    logger.error(`postInlineComment error: ${err.message}`)
-  }
-}
+    // ── Create review document ───────────────────
+    const review = await Review.create({
+      userId:   repo.userId,
+      repoId:   repo._id,
+      prNumber,
+      prTitle,
+      prUrl,
+      commitSha,
+      branch,
+      status:   'pending',
+      isManual: false,
+    })
 
-// ── Post Summary Comment ───────────────────────────────────
-const postSummaryComment = async (repoFullName, prNumber, body, token) => {
-  try {
-    const client = githubClient(token)
-    await client.post(
-      `/repos/${repoFullName}/issues/${prNumber}/comments`,
-      { body }
-    )
-    logger.info(`Summary comment posted on PR #${prNumber}`)
-  } catch (err) {
-    logger.error(`postSummaryComment error: ${err.message}`)
-  }
-}
+    // ── Fetch real files from GitHub API ─────────
+    const token   = process.env.GITHUB_TOKEN
+    const prFiles = await fetchPRFiles(repository.full_name, prNumber, token)
 
-// ── Add Webhook ────────────────────────────────────────────
-const addWebhook = async (repoFullName, token) => {
-  try {
-    const client   = githubClient(token)
-    const response = await client.post(
-      `/repos/${repoFullName}/hooks`,
-      {
-        name:   'web',
-        active: true,
-        events: ['pull_request'],
-        config: {
-          url:          `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/webhook/github`,
-          content_type: 'json',
-          secret:       process.env.GITHUB_WEBHOOK_SECRET,
-        },
-      }
+    logger.info(`Fetched ${prFiles.length} files from PR #${prNumber}`)
+
+    const files = await Promise.all(
+      prFiles.map(async (f) => {
+        const content = await fetchFileContent(f.raw_url, token)
+        const ext     = f.filename.split('.').pop().toLowerCase()
+        const langMap = {
+          js:   'javascript',
+          jsx:  'javascript',
+          ts:   'typescript',
+          tsx:  'typescript',
+          py:   'python',
+          java: 'java',
+          cpp:  'cpp',
+          c:    'c',
+        }
+        return {
+          filename: f.filename,
+          content:  typeof content === 'string' ? content : JSON.stringify(content),
+          language: langMap[ext] || 'javascript',
+        }
+      })
     )
-    logger.info(`Webhook added: ${repoFullName}`)
-    return response.data.id
+
+    logger.info(`Files ready for analysis: ${files.map(f => f.filename).join(', ')}`)
+
+    // ── Add to queue ─────────────────────────────
+    await addReviewJob({
+      reviewId:     review._id.toString(),
+      repoId:       repo._id.toString(),
+      userId:       repo.userId.toString(),
+      repoFullName: repository.full_name,
+      prNumber,
+      commitSha,
+      githubToken:  token,
+      files,
+      isManual:     false,
+    })
+
+    // ── Emit socket event ─────────────────────────
+    emitReviewQueued(review._id.toString(), {
+      prTitle,
+      repoName: repo.repoName,
+    })
+
+    await User.findByIdAndUpdate(repo.userId, { $inc: { totalReviews: 1 } })
+
+    logger.info(`Review queued: ${review._id} for PR #${prNumber}`)
+
   } catch (err) {
-    logger.error(`addWebhook error: ${err.message}`)
+    logger.error(`processPREvent error: ${err.message}`)
     throw err
   }
 }
 
-// ── Remove Webhook ─────────────────────────────────────────
-const removeWebhook = async (repoFullName, webhookId, token) => {
-  try {
-    const client = githubClient(token)
-    await client.delete(`/repos/${repoFullName}/hooks/${webhookId}`)
-    logger.info(`Webhook removed: ${repoFullName}`)
-  } catch (err) {
-    logger.error(`removeWebhook error: ${err.message}`)
-  }
-}
-
-// ── Format Summary Comment ─────────────────────────────────
-const formatSummaryComment = (review) => {
-  const gradeEmoji = {
-    A: '🟢', B: '🟡', C: '🟠', D: '🔴', F: '⛔'
-  }
-
-  const score = review.overallScore
-  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F'
-  const emoji = gradeEmoji[grade]
-
-  return `## ${emoji} CodeSense AI Review
-
-**Overall Score: ${score}/100 (${grade})**
-
-| Category | Score |
-|----------|-------|
-| 🔒 Security | ${review.securityScore}/100 |
-| 🐛 Bugs | ${review.bugScore}/100 |
-| ⚡ Complexity | ${review.complexityScore}/100 |
-| 🎨 Style | ${review.styleScore}/100 |
-
-**Issues Found:**
-- 🔴 Critical: ${review.criticalCount}
-- 🟠 High: ${review.highCount}
-- 🟡 Medium: ${review.mediumCount}
-- 🔵 Low: ${review.lowCount}
-
----
-*Powered by [CodeSense AI](${process.env.CLIENT_URL})*`
-}
-
-// ── Helper: Check supported file ───────────────────────────
-const isSupportedFile = (filename) => {
-  const supported = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c']
-  return supported.some(ext => filename.endsWith(ext))
-}
-const fetchUserRepos = async (token) => {
-  const client   = githubClient(token)
-  const response = await client.get('/user/repos?per_page=100&sort=updated')
-  return response.data.map(r => ({
-    id:        r.id,
-    name:      r.name,
-    fullName:  r.full_name,
-    language:  r.language,
-    isPrivate: r.private,
-    stars:     r.stargazers_count,
-  }))
-}
-
-module.exports = {
-  fetchPRFiles,
-  fetchFileContent,
-  postInlineComment,
-  postSummaryComment,
-  addWebhook,
-  removeWebhook,
-  formatSummaryComment,
-  fetchUserRepos,
-}
+module.exports = { verifySignature, processPREvent }

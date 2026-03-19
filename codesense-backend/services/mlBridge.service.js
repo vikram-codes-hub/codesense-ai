@@ -4,14 +4,27 @@ const logger = require('../utils/logger')
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000'
 const ML_TIMEOUT     = 60000 // 60 seconds
 
-// ── Analyze single file ────────────────────────────────────
+//Analyze single file
 const analyzeCode = async (content, filename) => {
   try {
     logger.info(`ML analysis: ${filename}`)
 
+    // Detect language from filename
+    const ext     = filename.split('.').pop().toLowerCase()
+    const langMap = {
+      js: 'javascript', jsx: 'javascript',
+      ts: 'typescript', tsx: 'typescript',
+      py: 'python', java: 'java', cpp: 'cpp', c: 'c',
+    }
+    const language = langMap[ext] || 'javascript'
+
     const response = await axios.post(
       `${ML_SERVICE_URL}/api/analyze`,
-      { content, filename },
+      {
+        code:     content,   
+        language: language, 
+        filename: filename,
+      },
       { timeout: ML_TIMEOUT }
     )
 
@@ -23,7 +36,7 @@ const analyzeCode = async (content, filename) => {
   }
 }
 
-// ── Health check ───────────────────────────────────────────
+//Health check
 const checkHealth = async () => {
   try {
     const response = await axios.get(
