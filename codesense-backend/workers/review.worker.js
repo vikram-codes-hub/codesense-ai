@@ -39,7 +39,7 @@ const initReviewWorker = (redisConnection) => {
           filename:    file.filename,
           language:    file.language || result.language,
           content:     file.content,
-          score:       result.score       || null,
+          score: result.score?.overall ?? result.score ?? null,
           totalIssues: result.total_issues || 0,
         })
 

@@ -1,133 +1,100 @@
-const crypto     = require('crypto')
-const Repository = require('../models/Repository')
+const { Worker } = require('bullmq')
+const axios      = require('axios')
+const Issue      = require('../models/Issue')
 const Review     = require('../models/Review')
-const User       = require('../models/User')
-const { addReviewJob }    = require('../queues/review.queue')
-const { emitReviewQueued } = require('../socket')
+const connection = require('../config/bullmq')
 const logger     = require('../utils/logger')
 
-// ── Verify GitHub Webhook Signature ───────────────────────
-const verifySignature = (body, signature) => {
-  if (!signature) return false
-  try {
-    const hmac      = crypto.createHmac('sha256', process.env.GITHUB_WEBHOOK_SECRET)
-    const digest    = 'sha256=' + hmac.update(body).digest('hex')
-    const sigBuffer = Buffer.from(signature)
-    const digBuffer = Buffer.from(digest)
-    if (sigBuffer.length !== digBuffer.length) return false
-    return crypto.timingSafeEqual(sigBuffer, digBuffer)
-  } catch (err) {
-    logger.error(`Signature verification error: ${err.message}`)
-    return false
-  }
+const postComment = async (repoFullName, prNumber, commitSha, filename, line, body, token) => {
+  await axios.post(
+    `https://api.github.com/repos/${repoFullName}/pulls/${prNumber}/comments`,
+    { body, commit_id: commitSha, path: filename, line, side: 'RIGHT' },
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', 'X-GitHub-Api-Version': '2022-11-28' } }
+  )
 }
 
-// ── Process PR Event ───────────────────────────────────────
-const processPREvent = async (payload) => {
-  try {
-    // Lazy require to avoid circular dependency
-    const { fetchPRFiles, fetchFileContent } = require('./github.service')
-
-    const { pull_request, repository, action } = payload
-
-    const githubRepoId = repository.id.toString()
-    const prNumber     = pull_request.number
-    const prTitle      = pull_request.title
-    const prUrl        = pull_request.html_url
-    const commitSha    = pull_request.head.sha
-    const branch       = pull_request.head.ref
-
-    logger.info(`PR event: ${action} #${prNumber} in ${repository.full_name}`)
-
-    // ── Find repo in our DB ──────────────────────
-    const repo = await Repository.findOne({ githubRepoId })
-    if (!repo) {
-      logger.warn(`Repo not found in DB: ${githubRepoId}`)
-      return
-    }
-
-    // ── Check for duplicate review ───────────────
-    const existing = await Review.findOne({
-      repoId:    repo._id,
-      prNumber,
-      commitSha,
-      status:    { $in: ['pending', 'running'] },
-    })
-    if (existing) {
-      logger.warn(`Duplicate review skipped: PR #${prNumber}`)
-      return
-    }
-
-    // ── Create review document ───────────────────
-    const review = await Review.create({
-      userId:   repo.userId,
-      repoId:   repo._id,
-      prNumber,
-      prTitle,
-      prUrl,
-      commitSha,
-      branch,
-      status:   'pending',
-      isManual: false,
-    })
-
-    // ── Fetch real files from GitHub API ─────────
-    const token   = process.env.GITHUB_TOKEN
-    const prFiles = await fetchPRFiles(repository.full_name, prNumber, token)
-
-    logger.info(`Fetched ${prFiles.length} files from PR #${prNumber}`)
-
-    const files = await Promise.all(
-      prFiles.map(async (f) => {
-        const content = await fetchFileContent(f.raw_url, token)
-        const ext     = f.filename.split('.').pop().toLowerCase()
-        const langMap = {
-          js:   'javascript',
-          jsx:  'javascript',
-          ts:   'typescript',
-          tsx:  'typescript',
-          py:   'python',
-          java: 'java',
-          cpp:  'cpp',
-          c:    'c',
-        }
-        return {
-          filename: f.filename,
-          content:  typeof content === 'string' ? content : JSON.stringify(content),
-          language: langMap[ext] || 'javascript',
-        }
-      })
-    )
-
-    logger.info(`Files ready for analysis: ${files.map(f => f.filename).join(', ')}`)
-
-    // ── Add to queue ─────────────────────────────
-    await addReviewJob({
-      reviewId:     review._id.toString(),
-      repoId:       repo._id.toString(),
-      userId:       repo.userId.toString(),
-      repoFullName: repository.full_name,
-      prNumber,
-      commitSha,
-      githubToken:  token,
-      files,
-      isManual:     false,
-    })
-
-    // ── Emit socket event ─────────────────────────
-    emitReviewQueued(review._id.toString(), {
-      prTitle,
-      repoName: repo.repoName,
-    })
-
-    await User.findByIdAndUpdate(repo.userId, { $inc: { totalReviews: 1 } })
-
-    logger.info(`Review queued: ${review._id} for PR #${prNumber}`)
-
-  } catch (err) {
-    logger.error(`processPREvent error: ${err.message}`)
-    throw err
-  }
+const postSummary = async (repoFullName, prNumber, body, token) => {
+  await axios.post(
+    `https://api.github.com/repos/${repoFullName}/issues/${prNumber}/comments`,
+    { body },
+    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', 'X-GitHub-Api-Version': '2022-11-28' } }
+  )
 }
 
-module.exports = { verifySignature, processPREvent }
+const buildSummary = (review) => {
+  const score = review.overallScore
+  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F'
+  const emoji = { A: '🟢', B: '🟡', C: '🟠', D: '🔴', F: '⛔' }[grade]
+  return `## ${emoji} CodeSense AI Review
+
+**Overall Score: ${score}/100 (${grade})**
+
+| Category | Score |
+|----------|-------|
+| 🔒 Security | ${review.securityScore}/100 |
+| 🐛 Bugs | ${review.bugScore}/100 |
+| ⚡ Complexity | ${review.complexityScore}/100 |
+| 🎨 Style | ${review.styleScore}/100 |
+
+**Issues Found:**
+- 🔴 Critical: ${review.criticalCount}
+- 🟠 High: ${review.highCount}
+- 🟡 Medium: ${review.mediumCount}
+- 🔵 Low: ${review.lowCount}
+
+> *Powered by CodeSense AI*`
+}
+
+const initGithubWorker = (redisConnection) => {
+  const worker = new Worker('github', async (job) => {
+    const { reviewId, repoFullName, prNumber, githubToken } = job.data
+
+    logger.info(`Posting GitHub comments → PR #${prNumber} | ${repoFullName}`)
+
+    const issues = await Issue.find({ reviewId, isPostedToGitHub: false }).sort({ severity: 1 })
+    const review = await Review.findById(reviewId)
+    if (!review) throw new Error(`Review not found: ${reviewId}`)
+
+    let postedCount = 0
+
+    for (const issue of issues) {
+      try {
+        const body = [
+          `**[${issue.severity.toUpperCase()}] ${issue.message}**`,
+          '',
+          issue.description || '',
+          issue.suggestion ? `\n💡 **Suggestion:** ${issue.suggestion}` : '',
+        ].filter(Boolean).join('\n')
+
+        await postComment(repoFullName, prNumber, review.commitSha, issue.filename, issue.line || 1, body, githubToken)
+        await Issue.findByIdAndUpdate(issue._id, { isPostedToGitHub: true })
+        postedCount++
+        await new Promise(r => setTimeout(r, 300))
+      } catch (err) {
+        logger.error(`Failed to post comment: ${err.message}`)
+      }
+    }
+
+    try {
+      await postSummary(repoFullName, prNumber, buildSummary(review), githubToken)
+    } catch (err) {
+      logger.error(`Failed to post summary: ${err.message}`)
+    }
+
+    await Review.findByIdAndUpdate(reviewId, { isPostedToGitHub: true })
+    global.io?.emit('review:posted', { reviewId, prNumber, repoFullName, postedCount })
+    logger.info(`GitHub comments posted → ${postedCount}/${issues.length}`)
+    return { reviewId, postedCount }
+
+  }, { connection: redisConnection, concurrency: 1 })
+
+  worker.on('completed', (job) => logger.info(`GitHub worker: job ${job.id} completed`))
+  worker.on('failed',    (job, err) => logger.error(`GitHub worker: job ${job.id} failed: ${err.message}`))
+  worker.on('error',     (err) => logger.error(`GitHub worker error: ${err.message}`))
+
+  logger.info('GitHub worker initialized')
+  return worker
+}
+
+const githubWorker = initGithubWorker(connection)
+module.exports = { githubWorker }

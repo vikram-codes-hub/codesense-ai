@@ -55,6 +55,46 @@
         "pattern": "deserialize(",
         "message": "Unsafe deserialization detected — remote code execution risk",
         "fix": "Use JSON.parse() for safe deserialization instead of third-party deserialize()."
+      },
+      {
+        "pattern": "vm.runInNewContext(",
+        "message": "vm.runInNewContext() can execute arbitrary code",
+        "fix": "Avoid executing dynamic code. Use safer alternatives."
+      },
+      {
+        "pattern": "vm.runInThisContext(",
+        "message": "vm.runInThisContext() executes arbitrary code",
+        "fix": "Avoid vm module for dynamic code execution with user input."
+      },
+      {
+        "pattern": "outerHTML =",
+        "message": "Setting outerHTML can cause XSS vulnerabilities",
+        "fix": "Use DOM methods instead of setting outerHTML with user data."
+      },
+      {
+        "pattern": "insertAdjacentHTML(",
+        "message": "insertAdjacentHTML with user input causes XSS",
+        "fix": "Sanitize input with DOMPurify before using insertAdjacentHTML."
+      },
+      {
+        "pattern": "setTimeout(\"",
+        "message": "setTimeout with string argument acts like eval()",
+        "fix": "Pass a function reference instead: setTimeout(() => doSomething(), delay)"
+      },
+      {
+        "pattern": "setInterval(\"",
+        "message": "setInterval with string argument acts like eval()",
+        "fix": "Pass a function reference instead: setInterval(() => doSomething(), delay)"
+      },
+      {
+        "pattern": "spawnSync(",
+        "message": "Synchronous shell spawn — command injection risk",
+        "fix": "Use spawn() async with validated arguments array."
+      },
+      {
+        "pattern": "require('vm')",
+        "message": "Node vm module used — potential sandbox escape",
+        "fix": "Avoid executing dynamic code from user input via vm module."
       }
     ],
     "high": [
@@ -94,14 +134,94 @@
         "fix": "Set httpOnly: true, secure: true, and sameSite: 'strict' on all cookies."
       },
       {
-        "pattern": "disable('x-powered-by')",
-        "message": "Consider adding security headers",
-        "fix": "Use helmet.js to set all security headers: app.use(helmet())"
-      },
-      {
         "pattern": "verify(",
         "message": "JWT verify without error handling can cause authentication bypass",
         "fix": "Always wrap jwt.verify() in try/catch and handle errors properly."
+      },
+      {
+        "pattern": "sql +",
+        "message": "SQL string concatenation detected — SQL injection risk",
+        "fix": "Use parameterized queries or an ORM instead of string concatenation."
+      },
+      {
+        "pattern": "query +",
+        "message": "SQL query concatenation — SQL injection risk",
+        "fix": "Use prepared statements with parameterized queries."
+      },
+      {
+        "pattern": "WHERE id = \" +",
+        "message": "SQL injection vulnerability — user input in query",
+        "fix": "Use parameterized queries: db.query('WHERE id = ?', [userId])"
+      },
+      {
+        "pattern": "WHERE id = ' +",
+        "message": "SQL injection vulnerability — user input in query",
+        "fix": "Use parameterized queries: db.query('WHERE id = ?', [userId])"
+      },
+      {
+        "pattern": "db.query(req.",
+        "message": "User input passed directly to database query",
+        "fix": "Sanitize and validate all user inputs before database operations."
+      },
+      {
+        "pattern": "fs.unlink(",
+        "message": "File deletion with potential path traversal",
+        "fix": "Validate file paths strictly before deletion operations."
+      },
+      {
+        "pattern": "fs.rmdir(",
+        "message": "Directory removal — potential path traversal",
+        "fix": "Validate paths and ensure operations are within allowed directories."
+      },
+      {
+        "pattern": "path.join(req.",
+        "message": "User input used in file path — path traversal risk",
+        "fix": "Use path.basename() and validate against allowed directory."
+      },
+      {
+        "pattern": "__proto__",
+        "message": "Prototype pollution vulnerability detected",
+        "fix": "Use Object.create(null) for dictionaries, validate keys, use Map instead."
+      },
+      {
+        "pattern": "constructor[",
+        "message": "Potential prototype pollution via constructor",
+        "fix": "Sanitize object keys and avoid setting constructor properties from user input."
+      },
+      {
+        "pattern": "helmet()",
+        "message": "Ensure helmet is configured properly",
+        "fix": "Use helmet with CSP: app.use(helmet({ contentSecurityPolicy: {...} }))"
+      },
+      {
+        "pattern": "app.disable('x-powered-by')",
+        "message": "Use helmet instead of manually disabling headers",
+        "fix": "Use helmet.js to set all security headers automatically."
+      },
+      {
+        "pattern": "cors({ origin: true",
+        "message": "CORS reflecting all origins — security risk",
+        "fix": "Whitelist specific origins: cors({ origin: process.env.CLIENT_URL })"
+      },
+      {
+        "pattern": "res.send(req.",
+        "message": "User input reflected in response — potential XSS",
+        "fix": "Escape user input before sending in response."
+      },
+      {
+        "pattern": "redirect(req.",
+        "message": "Open redirect vulnerability — user controls redirect URL",
+        "fix": "Validate redirect URLs against a whitelist of allowed destinations."
+      },
+      {
+        "pattern": "jwt.sign(",
+        "message": "JWT signing — ensure strong algorithm and secret",
+        "fix": "Use RS256 algorithm and strong secret. Set expiry: jwt.sign(payload, secret, { expiresIn: '1h' })"
+      },
+      {
+        "pattern": "algorithm: 'none'",
+        "message": "JWT with no algorithm — authentication bypass risk",
+        "fix": "Never use 'none' algorithm. Use RS256 or HS256 with a strong secret."
       }
     ],
     "medium": [
@@ -164,6 +284,71 @@
         "pattern": "createHash('sha1')",
         "message": "SHA1 is deprecated and cryptographically weak",
         "fix": "Use crypto.createHash('sha256') or stronger."
+      },
+      {
+        "pattern": "catch(e) {}",
+        "message": "Empty catch block silently swallows errors",
+        "fix": "Log errors or handle them properly. Never silently ignore exceptions."
+      },
+      {
+        "pattern": "catch(err) {}",
+        "message": "Empty catch block — errors are silently ignored",
+        "fix": "Add error logging: catch(err) { logger.error(err.message); }"
+      },
+      {
+        "pattern": "catch (e) {}",
+        "message": "Empty catch block silently swallows errors",
+        "fix": "Handle or log all caught exceptions."
+      },
+      {
+        "pattern": "process.env.NODE_ENV === 'development'",
+        "message": "Development-only code path detected",
+        "fix": "Ensure this code path is not reachable in production."
+      },
+      {
+        "pattern": "app.use(express.static",
+        "message": "Static file serving — ensure no sensitive files are exposed",
+        "fix": "Configure a .gitignore-style blocklist to prevent serving .env or config files."
+      },
+      {
+        "pattern": "multer(",
+        "message": "File upload handler — validate file types and size",
+        "fix": "Add file type whitelist, size limits, and virus scanning for uploads."
+      },
+      {
+        "pattern": "res.json(err)",
+        "message": "Full error object sent to client — may expose stack traces",
+        "fix": "Send generic error messages to clients. Log detailed errors server-side only."
+      },
+      {
+        "pattern": "res.send(err",
+        "message": "Error details sent to client — information disclosure",
+        "fix": "Never send raw error objects to clients. Use generic error messages."
+      },
+      {
+        "pattern": "parseInt(req.",
+        "message": "parseInt on user input without radix",
+        "fix": "Always specify radix: parseInt(req.params.id, 10)"
+      },
+      {
+        "pattern": "RegExp(req.",
+        "message": "User input used in RegExp — ReDoS vulnerability",
+        "fix": "Never create RegExp from user input. Use a regex library with timeout support."
+      },
+      {
+        "pattern": "new RegExp(",
+        "message": "Dynamic RegExp — potential ReDoS if using user input",
+        "fix": "Validate and sanitize input before using in RegExp."
+      },
+      {
+        "pattern": "serialize(",
+        "message": "Object serialization — ensure no sensitive data included",
+        "fix": "Explicitly whitelist fields to serialize rather than serializing entire objects."
+      },
+      {
+        "pattern": "JSON.parse(req.",
+        "message": "Parsing user-supplied JSON — validate schema after parsing",
+        "fix": "Use a JSON schema validator like joi or zod after parsing."
       }
     ],
     "low": [
@@ -181,6 +366,71 @@
         "pattern": "noValidate",
         "message": "Validation disabled — potential security risk",
         "fix": "Enable validation for all user inputs."
+      },
+      {
+        "pattern": "var ",
+        "message": "Use of var — prefer const/let for block scoping",
+        "fix": "Replace var with const (immutable) or let (mutable) for proper scoping."
+      },
+      {
+        "pattern": "== null",
+        "message": "Loose equality with null — use strict equality",
+        "fix": "Use === null for strict null checks."
+      },
+      {
+        "pattern": "== undefined",
+        "message": "Loose equality with undefined — use strict equality",
+        "fix": "Use === undefined or optional chaining: value?.property"
+      },
+      {
+        "pattern": "console.log(",
+        "message": "Console.log left in production code",
+        "fix": "Remove console.log statements or replace with a proper logger like winston."
+      },
+      {
+        "pattern": "debugger;",
+        "message": "Debugger statement left in code",
+        "fix": "Remove all debugger statements before committing."
+      },
+      {
+        "pattern": "TODO",
+        "message": "TODO comment indicates unfinished code",
+        "fix": "Complete or create a ticket for this TODO before merging."
+      },
+      {
+        "pattern": "FIXME",
+        "message": "FIXME comment indicates known bug",
+        "fix": "Fix this issue before merging to main branch."
+      },
+      {
+        "pattern": "HACK",
+        "message": "HACK comment indicates a workaround that needs proper fix",
+        "fix": "Replace this hack with a proper solution."
+      },
+      {
+        "pattern": "any;",
+        "message": "TypeScript 'any' type disables type checking",
+        "fix": "Use specific types or 'unknown' with type guards instead of 'any'."
+      },
+      {
+        "pattern": ": any",
+        "message": "TypeScript 'any' type annotation bypasses type safety",
+        "fix": "Define a proper interface or type instead of using 'any'."
+      },
+      {
+        "pattern": "@ts-ignore",
+        "message": "TypeScript error suppressed with @ts-ignore",
+        "fix": "Fix the TypeScript error instead of suppressing it."
+      },
+      {
+        "pattern": "eslint-disable",
+        "message": "ESLint rule disabled",
+        "fix": "Fix the underlying issue instead of disabling the linting rule."
+      },
+      {
+        "pattern": "no-op",
+        "message": "No-op function detected — possible placeholder",
+        "fix": "Implement proper functionality or remove the no-op."
       }
     ]
   },
@@ -221,6 +471,21 @@
         "pattern": "compile(",
         "message": "compile() with user input allows code injection",
         "fix": "Never compile user-controlled strings as Python code."
+      },
+      {
+        "pattern": "importlib.import_module(request",
+        "message": "Dynamic import from user input — code injection risk",
+        "fix": "Whitelist allowed module names before importing."
+      },
+      {
+        "pattern": "shelve.open(",
+        "message": "shelve uses pickle internally — deserialization risk",
+        "fix": "Use a database or JSON storage instead of shelve for untrusted data."
+      },
+      {
+        "pattern": "dill.loads(",
+        "message": "dill.loads() can execute arbitrary code like pickle",
+        "fix": "Never deserialize dill data from untrusted sources."
       }
     ],
     "high": [
@@ -255,14 +520,69 @@
         "fix": "Use yaml.safe_load() instead of yaml.load() for untrusted input."
       },
       {
+        "pattern": "flask.request.args",
+        "message": "Flask request args used — ensure input is validated",
+        "fix": "Validate and sanitize all request parameters before use."
+      },
+      {
+        "pattern": "cursor.execute(f\"",
+        "message": "f-string in SQL query — SQL injection vulnerability",
+        "fix": "Use parameterized queries: cursor.execute('SELECT * FROM t WHERE id = %s', (id,))"
+      },
+      {
+        "pattern": "cursor.execute(\"SELECT",
+        "message": "Raw SQL string execution — SQL injection risk",
+        "fix": "Use parameterized queries with %s placeholders."
+      },
+      {
+        "pattern": "+ request.args",
+        "message": "User input concatenated into string — injection risk",
+        "fix": "Validate and sanitize request.args before use."
+      },
+      {
+        "pattern": "f\"SELECT",
+        "message": "SQL query built with f-string — injection vulnerability",
+        "fix": "Use ORM methods or parameterized queries instead."
+      },
+      {
+        "pattern": "open(request.",
+        "message": "User input used in file open — path traversal risk",
+        "fix": "Validate file paths against a whitelist of allowed directories."
+      },
+      {
+        "pattern": "os.path.join(request.",
+        "message": "User input in file path — path traversal risk",
+        "fix": "Use os.path.basename() and validate against allowed directory."
+      },
+      {
+        "pattern": "flask.send_file(request.",
+        "message": "User-controlled file path in send_file — path traversal",
+        "fix": "Validate file path against allowed directory before sending."
+      },
+      {
+        "pattern": "jinja2.Template(",
+        "message": "Dynamic Jinja2 template from user input — SSTI risk",
+        "fix": "Never render user-controlled strings as templates."
+      },
+      {
+        "pattern": "render_template_string(request.",
+        "message": "Server-side template injection — critical vulnerability",
+        "fix": "Never pass user input to render_template_string()."
+      },
+      {
         "pattern": "xmlrpc",
         "message": "XML-RPC is vulnerable to XML injection attacks",
         "fix": "Use REST/JSON APIs instead of XML-RPC where possible."
       },
       {
-        "pattern": "flask.request.args",
-        "message": "Flask request args used — ensure input is validated",
-        "fix": "Validate and sanitize all request parameters before use."
+        "pattern": "lxml.etree.fromstring(",
+        "message": "XML parsing — XXE vulnerability if DTD processing enabled",
+        "fix": "Disable DTD processing: parser = etree.XMLParser(resolve_entities=False)"
+      },
+      {
+        "pattern": "xml.etree.ElementTree.fromstring(",
+        "message": "XML parsing from untrusted input — XXE risk",
+        "fix": "Use defusedxml library for safe XML parsing."
       }
     ],
     "medium": [
@@ -305,6 +625,61 @@
         "pattern": "verify=False",
         "message": "SSL certificate verification disabled",
         "fix": "Always verify SSL certificates. Remove verify=False and fix the certificate issue."
+      },
+      {
+        "pattern": "except:",
+        "message": "Bare except clause catches all exceptions including SystemExit",
+        "fix": "Specify exception types: except Exception as e: or except (TypeError, ValueError) as e:"
+      },
+      {
+        "pattern": "except Exception:",
+        "message": "Overly broad exception handler",
+        "fix": "Catch specific exceptions: except (ValueError, KeyError) as e:"
+      },
+      {
+        "pattern": "pass",
+        "message": "Bare pass in exception handler silently swallows errors",
+        "fix": "Log the error: logger.error(f'Error: {e}') instead of just pass."
+      },
+      {
+        "pattern": "assert ",
+        "message": "Assert statements are disabled with -O flag — don't use for security",
+        "fix": "Use explicit if/raise for security checks instead of assert."
+      },
+      {
+        "pattern": "input(",
+        "message": "input() reads raw user input — validate before use",
+        "fix": "Always validate and sanitize input() results before use."
+      },
+      {
+        "pattern": "requests.get(url,",
+        "message": "HTTP request — ensure URL is not user-controlled",
+        "fix": "Validate URLs against a whitelist before making requests (SSRF prevention)."
+      },
+      {
+        "pattern": "requests.post(url,",
+        "message": "HTTP POST request — validate target URL (SSRF risk)",
+        "fix": "Whitelist allowed URLs before making server-side requests."
+      },
+      {
+        "pattern": "CORS(app)",
+        "message": "Flask-CORS without restrictions — all origins allowed",
+        "fix": "Restrict origins: CORS(app, origins=['https://yourdomain.com'])"
+      },
+      {
+        "pattern": "jwt.decode(",
+        "message": "JWT decode — ensure algorithm is specified",
+        "fix": "Always specify algorithms: jwt.decode(token, key, algorithms=['HS256'])"
+      },
+      {
+        "pattern": "logging.basicConfig(level=logging.DEBUG",
+        "message": "Debug logging in production may expose sensitive data",
+        "fix": "Use logging.INFO or logging.WARNING in production."
+      },
+      {
+        "pattern": "print(request.",
+        "message": "Printing request data — may log sensitive information",
+        "fix": "Use proper logging with appropriate log levels and data sanitization."
       }
     ],
     "low": [
@@ -324,14 +699,59 @@
         "fix": "Never print secrets or sensitive configuration values."
       },
       {
-        "pattern": "except:",
-        "message": "Bare except clause catches all exceptions including SystemExit",
-        "fix": "Specify exception types: except Exception as e: or except (TypeError, ValueError) as e:"
-      },
-      {
         "pattern": "pass  # TODO",
         "message": "Unimplemented code block (TODO)",
         "fix": "Implement this block before deploying to production."
+      },
+      {
+        "pattern": "TODO",
+        "message": "TODO comment indicates unfinished code",
+        "fix": "Complete or create a ticket for this TODO before merging."
+      },
+      {
+        "pattern": "FIXME",
+        "message": "FIXME indicates a known bug",
+        "fix": "Fix this issue before merging to main branch."
+      },
+      {
+        "pattern": "global ",
+        "message": "Global variable usage — reduces testability and can cause bugs",
+        "fix": "Avoid global state. Pass variables as parameters or use class attributes."
+      },
+      {
+        "pattern": "mutable default",
+        "message": "Mutable default argument — shared between all function calls",
+        "fix": "Use None as default and initialize inside function: def f(items=None): items = items or []"
+      },
+      {
+        "pattern": "def f(items=[]",
+        "message": "Mutable list as default argument — shared state bug",
+        "fix": "Use None default: def f(items=None): items = items or []"
+      },
+      {
+        "pattern": "def f(items={}",
+        "message": "Mutable dict as default argument — shared state bug",
+        "fix": "Use None default: def f(items=None): items = items or {}"
+      },
+      {
+        "pattern": "type(x) ==",
+        "message": "Use isinstance() instead of type() for type checking",
+        "fix": "Use isinstance(x, ExpectedType) for proper type checking."
+      },
+      {
+        "pattern": "lambda:",
+        "message": "Empty lambda function — possible placeholder",
+        "fix": "Implement proper function logic or use a named function."
+      },
+      {
+        "pattern": "# noqa",
+        "message": "Linting rule suppressed with noqa",
+        "fix": "Fix the underlying issue instead of suppressing the linting warning."
+      },
+      {
+        "pattern": "pylint: disable",
+        "message": "Pylint check disabled",
+        "fix": "Fix the underlying issue instead of disabling the pylint check."
       }
     ]
   },
@@ -476,6 +896,81 @@
       "pattern": "FIREBASE_PRIVATE_KEY",
       "message": "Firebase private key detected in source code",
       "fix": "Store Firebase credentials in environment variables or use service account JSON securely."
+    },
+    {
+      "pattern": "OPENAI_API_KEY",
+      "message": "OpenAI API key detected in source code",
+      "fix": "Store in environment variables immediately. Revoke and regenerate at platform.openai.com."
+    },
+    {
+      "pattern": "ANTHROPIC_API_KEY",
+      "message": "Anthropic API key detected in source code",
+      "fix": "Store in environment variables and revoke the exposed key."
+    },
+    {
+      "pattern": "REDIS_PASSWORD",
+      "message": "Redis password hardcoded in source code",
+      "fix": "Use environment variables: process.env.REDIS_PASSWORD"
+    },
+    {
+      "pattern": "DATABASE_URL",
+      "message": "Database URL may contain credentials",
+      "fix": "Store DATABASE_URL in environment variables, never commit to version control."
+    },
+    {
+      "pattern": "POSTGRES_PASSWORD",
+      "message": "PostgreSQL password hardcoded",
+      "fix": "Use environment variables for all database credentials."
+    },
+    {
+      "pattern": "MYSQL_ROOT_PASSWORD",
+      "message": "MySQL root password hardcoded",
+      "fix": "Use environment variables: process.env.MYSQL_ROOT_PASSWORD"
+    },
+    {
+      "pattern": "connectionString = \"",
+      "message": "Hardcoded database connection string",
+      "fix": "Store connection strings in environment variables."
+    },
+    {
+      "pattern": "Bearer eyJ",
+      "message": "JWT token hardcoded in source code",
+      "fix": "Never hardcode tokens. Use environment variables or token refresh flows."
+    },
+    {
+      "pattern": "ghp_",
+      "message": "GitHub Personal Access Token detected",
+      "fix": "Revoke this token immediately at github.com/settings/tokens and use environment variables."
+    },
+    {
+      "pattern": "gho_",
+      "message": "GitHub OAuth token detected in source code",
+      "fix": "Revoke this token and store OAuth tokens securely."
+    },
+    {
+      "pattern": "xoxb-",
+      "message": "Slack Bot token detected in source code",
+      "fix": "Revoke at api.slack.com and store in environment variables."
+    },
+    {
+      "pattern": "xoxp-",
+      "message": "Slack User token detected in source code",
+      "fix": "Revoke at api.slack.com and store in environment variables."
+    },
+    {
+      "pattern": "MAILGUN_API_KEY",
+      "message": "Mailgun API key detected",
+      "fix": "Store in environment variables and revoke the exposed key at mailgun.com."
+    },
+    {
+      "pattern": "CLOUDINARY_API_SECRET",
+      "message": "Cloudinary API secret detected",
+      "fix": "Store in environment variables. Revoke at cloudinary.com/console."
+    },
+    {
+      "pattern": "HEROKU_API_KEY",
+      "message": "Heroku API key detected in source code",
+      "fix": "Revoke at dashboard.heroku.com and store in environment variables."
     }
   ]
 }
