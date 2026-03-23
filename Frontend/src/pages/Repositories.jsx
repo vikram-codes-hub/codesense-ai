@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { GitBranch, Plus, Search } from 'lucide-react'
 import { useRepo } from '../hooks/useRepo'
-import RepoCard         from '../components/Repostries/RepoCard'
+import RepoCard         from '../components/Repostries/Repocard'
 import ConnectRepoModal from '../components/Repostries/ConnectRepoModal'
 
 export default function Repositories() {
