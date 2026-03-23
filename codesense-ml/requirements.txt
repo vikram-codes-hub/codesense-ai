@@ -12,3 +12,4 @@ esprima==4.0.1
 
 # Utilities
 requests==2.31.0
+gunicorn==21.2.0
