@@ -27,7 +27,6 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(true)
         })
         .catch(() => {
-
           localStorage.removeItem('token')
         })
         .finally(() => setLoading(false))
@@ -52,13 +51,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider value={{
-      user,
-      token,
-      isAuthenticated,
-      loading,
-      login,
-      logout,
-      setUser,
+      user, token, isAuthenticated, loading, login, logout, setUser,
     }}>
       {children}
     </AuthContext.Provider>
@@ -66,3 +59,33 @@ export const AuthProvider = ({ children }) => {
 }
 
 export const useAuth = () => useContext(AuthContext)
+
+/* ── LayoutContext ─────────────────────────────────────
+   Placed here to avoid creating a new file.
+   Import useLayout wherever you need sidebarOpen state.
+──────────────────────────────────────────────────────── */
+const LayoutContext = createContext(null)
+
+export const LayoutProvider = ({ children }) => {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isNarrow,    setIsNarrow]    = useState(false)
+
+  useEffect(() => {
+    const check = () => {
+      const narrow = window.innerWidth < 768
+      setIsNarrow(narrow)
+      setSidebarOpen(!narrow)          // wide → open by default; narrow → closed
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  return (
+    <LayoutContext.Provider value={{ sidebarOpen, setSidebarOpen, isNarrow }}>
+      {children}
+    </LayoutContext.Provider>
+  )
+}
+
+export const useLayout = () => useContext(LayoutContext)
