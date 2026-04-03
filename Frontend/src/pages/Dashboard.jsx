@@ -58,11 +58,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Stats Grid ──────────────────────────────── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        gap: 16, marginBottom: 24,
-      }}>
+      <div className="grid-stats">
         <StatsWidget
           title="Total Reviews"
           value={stats?.totalReviews ?? 0}
@@ -94,11 +90,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Main Grid ───────────────────────────────── */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 380px',
-        gap: 16, marginBottom: 24,
-      }}>
+      <div className="grid-main">
         <ActivityChart />
         <RecentReviews reviews={recent} />
       </div>
@@ -129,11 +121,7 @@ export default function Dashboard() {
             <p>No repositories connected yet</p>
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
-            gap: 14,
-          }}>
+          <div className="grid-repos">
             {repos.map(repo => (
               <RepoCard key={repo._id} repo={repo} />
             ))}

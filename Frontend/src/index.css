@@ -187,3 +187,106 @@ input:-webkit-autofill:active {
   caret-color: #e6edf3;
   transition: background-color 9999s ease-in-out 0s;
 }
+
+/* ── Responsive Grid Utilities ─────────────────────── */
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.grid-main {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.grid-repos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 1024px) {
+  .grid-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .grid-main {
+    grid-template-columns: 1fr;
+  }
+  .grid-repos {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .grid-main {
+    grid-template-columns: 1fr;
+  }
+  .grid-repos {
+    grid-template-columns: 1fr;
+  }
+}
+/* ── Dashboard root ────────────────────────────────── */
+.dashboard-root {
+  animation: fadeIn 0.3s ease;
+  min-width: 0;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* ── Responsive Grids ──────────────────────────────── */
+.grid-stats,
+.grid-main,
+.grid-repos {
+  min-width: 0;
+}
+
+.grid-stats > *,
+.grid-main  > *,
+.grid-repos > * {
+  min-width: 0;
+}
+
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.grid-main {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.grid-repos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+/* ── 1024px — tablet landscape ─────────────────────── */
+@media (max-width: 1024px) {
+  .grid-stats { grid-template-columns: repeat(2, 1fr); }
+  .grid-main  { grid-template-columns: 1fr; }
+  .grid-repos { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── 640px — mobile ────────────────────────────────── */
+@media (max-width: 640px) {
+  .grid-stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .grid-main  { grid-template-columns: 1fr; }
+  .grid-repos { grid-template-columns: 1fr; }
+}
