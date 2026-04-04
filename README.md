@@ -1,6 +1,6 @@
 # 🔍 CodeSense AI — Automated Code Review Platform
 
-> **AI-powered code reviewer that automatically analyzes every GitHub Pull Request for security vulnerabilities, bugs, and complexity issues — posts inline comments like a senior developer, and generates AI-powered fixes using Gemini — in under 30 seconds.**
+> **AI-powered code reviewer that automatically analyzes every GitHub Pull Request for security vulnerabilities, bugs, and complexity issues — posts inline comments like a senior developer, and generates AI-powered fixes using Gemini & Groq — in under 30 seconds.**
 
 <br/>
 
@@ -10,17 +10,20 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react)
 ![Redis](https://img.shields.io/badge/Redis-BullMQ-red?style=for-the-badge&logo=redis)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker)
 ![License](https://img.shields.io/badge/License-MIT-purple?style=for-the-badge)
 
 <br/>
 
 ## 🌐 Live Demo
 
-| Service | URL |
-|---------|-----|
-| 🖥️ **Frontend** | [codesense-ai-2mqt.vercel.app](https://codesense-ai-2mqt.vercel.app) |
-| ⚙️ **Backend API** | [codesense-ai-production.up.railway.app](https://codesense-ai-production-4a5b.up.railway.app/api/health) |
-| 🤖 **ML Service** | [codesense-ai-fifb.onrender.com](https://codesense-ai-fifb.onrender.com) |
+| Service | URL | Platform |
+|---------|-----|----------|
+| 🖥️ **Frontend** | [codesense-ai-5pvs.vercel.app](https://codesense-ai-5pvs.vercel.app/auth) | Vercel |
+| ⚙️ **Backend API** | [codesense-ai-1-d8u8.onrender.com](https://codesense-ai-1-d8u8.onrender.com) | Render |
+| 🤖 **ML Service** | [codesense-ai-fifb.onrender.com](https://codesense-ai-fifb.onrender.com) | Render |
+
+> ⚠️ Free tier services may take 30-50 seconds to wake up on first request.
 
 ---
 
@@ -35,7 +38,7 @@ Connect your GitHub repo once → open any Pull Request → within **30 seconds*
 - ✅ Posts **inline comments directly on your GitHub PR** — on the exact lines with problems
 - ✅ Gives an **overall code quality score** (0–100) with grade breakdown
 - ✅ Updates your dashboard **live via WebSocket**
-- ✅ Generates **AI-powered fix suggestions** using Gemini (with Grok fallback)
+- ✅ Generates **AI-powered fix suggestions** using Gemini (with Groq fallback)
 
 ---
 
@@ -60,7 +63,7 @@ GitHub PR gets inline comments automatically:
 
   Line 12: 🔴 CRITICAL — SQL Injection vulnerability
            User input directly concatenated into SQL query.
-           💡 Fix: Use parameterized queries: db.query('WHERE id = ?', [id])
+           Fix: Use parameterized queries
 
   Line 6:  🔴 CRITICAL — Hardcoded API key detected
            Fix: Use environment variables: process.env.API_KEY
@@ -71,7 +74,7 @@ Overall Score: 46 / 100 — Grade D (Poor)
 Click "⚡ AI Fix" on any issue:
   → Gemini AI explains the exact danger in context
   → Shows corrected code with confidence score
-  → Falls back to Grok if Gemini unavailable
+  → Falls back to Groq (Llama 3.3 70B) if Gemini unavailable
 ```
 
 ---
@@ -80,13 +83,13 @@ Click "⚡ AI Fix" on any issue:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     GitHub                                   │
-│   Pull Request → Webhook Event → OAuth Login                │
+│                         GitHub                               │
+│      Pull Request → Webhook Event → OAuth Login             │
 └──────────────────────┬──────────────────────────────────────┘
                        │ webhook POST
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Node.js Backend (Railway)                       │
+│           Node.js Backend (Render)                           │
 │                                                             │
 │  Express API ←──── JWT Auth ────→ Passport GitHub OAuth     │
 │       │                                                     │
@@ -100,13 +103,13 @@ Click "⚡ AI Fix" on any issue:
                        │ HTTP
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│           Python Flask ML Service (Render)                   │
+│         Python Flask ML Service (Render)                     │
 │                                                             │
 │  /api/analyze                                               │
 │       │                                                     │
 │  ┌────┴────────────────────────────────────┐               │
 │  │  complexity.py  ← Radon cyclomatic      │               │
-│  │  security.py    ← Bandit + 150 patterns │               │
+│  │  security.py    ← 150+ patterns         │               │
 │  │  bugs.py        ← AST parsing           │               │
 │  │  style.py       ← Pattern rules         │               │
 │  └─────────────────────────────────────────┘               │
@@ -114,7 +117,7 @@ Click "⚡ AI Fix" on any issue:
                        │ Socket.IO
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              React Frontend (Vercel)                         │
+│           React Frontend (Vercel)                            │
 │                                                             │
 │  Dashboard → Repositories → Review Detail → Manual Review   │
 │       │                           │                         │
@@ -122,16 +125,14 @@ Click "⚡ AI Fix" on any issue:
 │  Score Ring                 Issue List                      │
 │  Stats Cards                ⚡ AI Fix Button                │
 └─────────────────────────────────────────────────────────────┘
-                       │ API
+                       │ API call
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              AI Fix Service (Multi-Provider)                 │
+│         AI Fix Service (Multi-Provider)                      │
 │                                                             │
-│  Issue detected → Build context prompt                      │
-│       │                                                     │
-│  Gemini 1.5 Flash (primary, free)                          │
+│  Gemini 2.0 Flash (primary)                                │
 │       ↓ fallback                                           │
-│  Grok Beta (xAI)                                           │
+│  Groq — Llama 3.3 70B (free, fast)                        │
 │       ↓                                                    │
 │  Returns: explanation + fixed code + confidence %          │
 └─────────────────────────────────────────────────────────────┘
@@ -148,39 +149,30 @@ Click "⚡ AI Fix" on any issue:
 - Unsafe execution — eval(), exec(), Function(), vm.runInContext()
 - Command injection — child_process, os.system(), shell=True
 - Weak cryptography — MD5, SHA1, Math.random()
-- Prototype pollution — `__proto__`, constructor manipulation
-- Path traversal — user input in file paths
-- SSTI — Jinja2 template injection
-- JWT vulnerabilities — algorithm:none, missing verification
+- Prototype pollution, Path traversal, SSTI, JWT vulnerabilities
 - Token detection — GitHub `ghp_`, Slack `xoxb-`, Stripe `sk_live_`
 
 ### 🐛 Bug Detection
-- Unused variables and imports
-- Empty catch blocks silently swallowing errors
-- Null pointer risks and missing error handling
-- Mutable default arguments (Python)
-- Type mismatches and loose equality
+- Unused variables, empty catch blocks, null pointer risks
+- Missing error handling, mutable default arguments (Python)
 
 ### 🧠 Complexity Scoring
-- Cyclomatic complexity per function via Radon
-- Flags functions with complexity > 10
-- Deep nesting detection (> 4 levels)
-- Functions too long (> 50 lines)
+- Cyclomatic complexity via Radon, deep nesting detection
+- Functions too long, magic numbers
 
 ### 🤖 AI Fix Suggestions
-- Click **⚡ AI Fix** on any detected issue
-- Gemini 1.5 Flash explains WHY it's dangerous in context
-- Provides corrected code snippet with confidence score
-- Automatic fallback: Gemini → Grok
-- Results cached in MongoDB — no repeated API calls
+- **⚡ AI Fix** button on every detected issue
+- Gemini 2.0 Flash explains danger + shows corrected code
+- Automatic fallback: Gemini → Groq (Llama 3.3 70B)
+- Results cached in MongoDB
 
 ### 🔴 Severity System
-| Badge | Level | Score Penalty |
-|-------|-------|---------------|
-| 🔴 | Critical | -25 points |
-| 🟠 | High | -15 points |
-| 🟡 | Medium | -8 points |
-| 🔵 | Low | -3 points |
+| Badge | Level | Penalty |
+|-------|-------|---------|
+| 🔴 | Critical | -25 pts |
+| 🟠 | High | -15 pts |
+| 🟡 | Medium | -8 pts |
+| 🔵 | Low | -3 pts |
 
 ---
 
@@ -189,43 +181,34 @@ Click "⚡ AI Fix" on any issue:
 ### Backend — Node.js
 | Technology | Purpose |
 |------------|---------|
-| Express.js | REST API server |
-| MongoDB + Mongoose | Database & schemas |
-| Redis Cloud + ioredis | Queue broker + caching |
-| BullMQ | Async job queue with retry |
-| Socket.IO | Real-time WebSocket events |
-| JWT + bcryptjs | Authentication |
-| Passport.js | GitHub OAuth 2.0 |
-| Axios | GitHub API + ML service calls |
-| Winston | Structured logging |
+| Express.js | REST API |
+| MongoDB + Mongoose | Database |
+| Redis + BullMQ | Job queue |
+| Socket.IO | Real-time events |
+| JWT + Passport.js | Auth + GitHub OAuth |
+| Winston | Logging |
 
 ### ML Service — Python
 | Technology | Purpose |
 |------------|---------|
-| Flask + Flask-CORS | Microservice REST API |
-| Gunicorn | Production WSGI server |
-| Radon | Cyclomatic complexity analysis |
-| Bandit | Security vulnerability scanning |
-| Pyflakes | Bug detection |
-| Esprima | JavaScript AST parsing |
-| AST (built-in) | Python code structure parsing |
+| Flask + Gunicorn | API server |
+| Radon | Complexity analysis |
+| Bandit | Security scanning |
+| Esprima + AST | Code parsing |
 
 ### Frontend — React
 | Technology | Purpose |
 |------------|---------|
-| React 18 + Vite | UI framework |
-| Monaco Editor | VS Code-style code viewer with markers |
-| Socket.IO Client | Live review progress updates |
-| Axios | HTTP client with auth interceptors |
-| Zustand | Lightweight state management |
-| React Router v6 | Client-side routing |
-| Lucide React | Icon library |
+| React 18 + Vite | UI |
+| Monaco Editor | Code viewer |
+| Socket.IO Client | Live updates |
+| Zustand | State management |
 
 ### AI Services
-| Provider | Role | Model |
-|----------|------|-------|
-| Google Gemini | Primary AI fix provider | gemini-1.5-flash |
-| xAI Grok | Fallback AI provider | grok-beta |
+| Provider | Model | Role |
+|----------|-------|------|
+| Google Gemini | gemini-2.0-flash | Primary |
+| Groq | llama-3.3-70b-versatile | Fallback (free) |
 
 ---
 
@@ -233,228 +216,122 @@ Click "⚡ AI Fix" on any issue:
 
 ```
 codesense-ai/
+├── docker-compose.yml
+├── .env
+├── .gitignore
+├── README.md
 ├── codesense-backend/
-│   ├── config/
-│   │   ├── db.js               ← MongoDB connection
-│   │   ├── redis.js            ← Redis Cloud connection
-│   │   ├── bullmq.js           ← BullMQ connection config
-│   │   └── Passport.js         ← GitHub OAuth strategy
+│   ├── Dockerfile
 │   ├── controllers/
-│   │   ├── auth.controller.js
-│   │   ├── repo.controller.js
-│   │   ├── review.controller.js ← includes getAIFix
-│   │   ├── dashboard.controller.js
-│   │   └── webhook.controller.js
-│   ├── models/
-│   │   ├── User.js
-│   │   ├── Repository.js
-│   │   ├── Review.js
-│   │   ├── ReviewFile.js
-│   │   └── Issue.js             ← includes AI fix fields
+│   ├── models/          ← Issue.js has AI fix fields
 │   ├── queues/
-│   │   ├── review.queue.js
-│   │   └── github.queue.js
 │   ├── workers/
-│   │   ├── review.worker.js     ← ML analysis pipeline
-│   │   └── github.worker.js     ← GitHub comments posting
 │   ├── services/
-│   │   ├── ai.service.js        ← Gemini + Grok multi-provider
-│   │   ├── mlBridge.service.js  ← Python ML service client
-│   │   ├── webhook.service.js   ← PR event processing
-│   │   └── github.service.js    ← GitHub API wrapper
+│   │   └── ai.service.js  ← Gemini + Groq
 │   ├── routes/
-│   │   ├── auth.routes.js
-│   │   ├── repo.routes.js
-│   │   ├── review.routes.js
-│   │   ├── dashboard.routes.js
-│   │   └── webhook.routes.js
 │   ├── socket/
-│   │   └── index.js             ← Socket.IO event handlers
-│   ├── middleware/
-│   │   ├── auth.middleware.js
-│   │   ├── error.middleware.js
-│   │   └── rateLimit.middleware.js
-│   ├── Tests/
-│   │   ├── webhook.service.test.js
-│   │   ├── review.worker.test.js
-│   │   └── auth.controller.test.js
-│   └── utils/
-│       ├── logger.js
-│       ├── jwt.utils.js
-│       └── response.utils.js
-│
+│   └── Tests/
 ├── codesense-ml/
+│   ├── Dockerfile
 │   ├── analyzers/
-│   │   ├── complexity.py        ← Radon cyclomatic complexity
-│   │   ├── security.py          ← 150+ pattern detection
-│   │   ├── bugs.py              ← AST-based bug detection
-│   │   └── style.py             ← Style rule analysis
 │   ├── parsers/
-│   │   ├── python_parser.py
-│   │   └── javascript_parser.py
-│   ├── routes/
-│   │   ├── analyze.py           ← /api/analyze endpoint
-│   │   └── health.py
-│   ├── utils/
-│   │   ├── scorer.py            ← Score calculation
-│   │   └── formatter.py         ← Response formatting
 │   └── data/
-│       └── security_patterns.json ← 150+ security patterns
-│
-└── codesense-frontend/
+│       └── security_patterns.json
+└── Frontend/
+    ├── Dockerfile
+    ├── nginx.conf
     └── src/
         ├── pages/
-        │   ├── Auth.jsx
-        │   ├── Dashboard.jsx
-        │   ├── Repositories.jsx
-        │   ├── ReviewDetail.jsx
-        │   ├── ManualReview.jsx
-        │   └── Settings.jsx
         ├── components/
-        │   ├── review/
-        │   │   ├── IssueCard.jsx  ← AI Fix button + display
-        │   │   ├── IssueList.jsx
-        │   │   ├── ScoreCard.jsx
-        │   │   ├── FileViewer.jsx
-        │   │   └── LiveFeed.jsx
-        │   └── dashboard/
-        │       ├── StatsWidget.jsx
-        │       └── RecentReviews.jsx
+        │   └── review/
+        │       └── IssueCard.jsx  ← AI Fix UI
         ├── hooks/
-        │   ├── useAuth.js
-        │   ├── useReview.js      ← includes getAIFix
-        │   ├── useRepo.js
-        │   └── useSocket.js
-        ├── context/
-        │   ├── AuthContext.jsx
-        │   └── SocketContext.jsx
         └── store/
-            ├── authStore.js
-            └── reviewStore.js
 ```
 
 ---
 
-## 🚀 Getting Started Locally
+## 🚀 Getting Started
 
-### Prerequisites
-```
-Node.js 18+
-Python 3.10+
-MongoDB Atlas account (free)
-Redis Cloud account (free)
-GitHub account
-```
+### Option 1 — Docker (Recommended)
 
-### 1. Clone the repo
 ```bash
 git clone https://github.com/vikram-codes-hub/codesense-ai.git
 cd codesense-ai
+
+# Create .env file with your credentials
+cp .env.example .env
+
+# Run all services
+docker compose up --build
 ```
 
-### 2. Setup Backend
+Open http://localhost:3000
+
+### Option 2 — Manual
+
 ```bash
-cd codesense-backend
-npm install
+# Terminal 1 — Backend
+cd codesense-backend && npm install && nodemon server.js
+
+# Terminal 2 — ML Service
+cd codesense-ml && pip install -r requirements.txt && python app.py
+
+# Terminal 3 — Frontend
+cd Frontend && npm install && npm run dev
+
+# Terminal 4 — Webhook tunnel
+ngrok http 5000
 ```
 
-Create `.env`:
+---
+
+## 🔧 Environment Variables
+
+### Backend
 ```env
 PORT=5000
 NODE_ENV=development
 MONGO_URI=your_mongodb_uri
 JWT_SECRET=your_jwt_secret
 JWT_EXPIRE=7d
-GITHUB_CLIENT_ID=your_github_client_id
-GITHUB_CLIENT_SECRET=your_github_client_secret
+GITHUB_CLIENT_ID=your_client_id
+GITHUB_CLIENT_SECRET=your_client_secret
 GITHUB_CALLBACK_URL=http://localhost:5000/api/auth/github/callback
 GITHUB_WEBHOOK_SECRET=your_webhook_secret
 GITHUB_TOKEN=your_personal_access_token
 ML_SERVICE_URL=http://localhost:8000
-CLIENT_URL=http://localhost:5173
+CLIENT_URL=http://localhost:3000
 REDIS_HOST=your_redis_host
 REDIS_PORT=your_redis_port
 REDIS_PASSWORD=your_redis_password
-GEMINI_API_KEY=your_gemini_api_key
-GROK_API_KEY=your_grok_api_key
+GEMINI_API_KEY=your_gemini_key
+GROQ_API_KEY=your_groq_key
 ```
 
-```bash
-nodemon server.js
-```
-
-### 3. Setup ML Service
-```bash
-cd codesense-ml
-pip install -r requirements.txt
-python app.py
-```
-
-### 4. Setup Frontend
-```bash
-cd codesense-frontend
-npm install
-```
-
-Create `.env`:
+### Frontend
 ```env
 VITE_API_URL=http://localhost:5000
 VITE_SOCKET_URL=http://localhost:5000
-```
-
-```bash
-npm run dev
-```
-
-### 5. Expose backend for GitHub webhooks
-```bash
-ngrok http 5000
-# Copy the URL → update GITHUB_CALLBACK_URL in .env
-# Add webhook in GitHub repo settings
 ```
 
 ---
 
 ## 🔌 API Reference
 
-### Auth
 ```
-POST   /api/auth/register          ← email/password signup
-POST   /api/auth/login             ← email/password login
-GET    /api/auth/github            ← GitHub OAuth redirect
-GET    /api/auth/github/callback   ← GitHub OAuth callback
-GET    /api/auth/me                ← get current user
-PUT    /api/auth/profile           ← update profile
-PUT    /api/auth/password          ← change password
-```
-
-### Repositories
-```
-GET    /api/repos                  ← connected repos
-GET    /api/repos/github           ← fetch from GitHub API
-POST   /api/repos/connect          ← connect a repo
-DELETE /api/repos/:id              ← disconnect repo
-```
-
-### Reviews
-```
-GET    /api/reviews                ← all reviews (paginated)
-GET    /api/reviews/:id            ← review + all issues
-GET    /api/reviews/:id/files      ← review files with issues
-POST   /api/reviews/manual         ← manual code review
-DELETE /api/reviews/:id            ← delete review
-POST   /api/reviews/:id/issues/:issueId/ai-fix  ← generate AI fix
-```
-
-### Dashboard
-```
-GET    /api/dashboard/stats        ← user statistics
-GET    /api/dashboard/recent       ← recent reviews
-```
-
-### Webhooks
-```
-POST   /api/webhook/github         ← GitHub PR webhook receiver
+POST   /api/auth/register
+POST   /api/auth/login
+GET    /api/auth/github
+GET    /api/repos
+POST   /api/repos/connect
+GET    /api/reviews
+GET    /api/reviews/:id
+GET    /api/reviews/:id/files
+POST   /api/reviews/manual
+POST   /api/reviews/:id/issues/:issueId/ai-fix
+GET    /api/dashboard/stats
+POST   /api/webhook/github
 ```
 
 ---
@@ -462,45 +339,34 @@ POST   /api/webhook/github         ← GitHub PR webhook receiver
 ## 📡 WebSocket Events
 
 ```
-Server → Client:
-  review:queued      { reviewId, prTitle, repoName }
-  review:started     { reviewId, totalFiles }
-  review:file:done   { reviewId, filename, fileScore, issuesFound }
-  review:complete    { reviewId, overallScore, totalIssues, grade }
-  review:failed      { reviewId, error }
-  review:posted      { reviewId, postedCount }
+review:queued      → review added to queue
+review:started     → analysis began
+review:file:done   → one file analyzed
+review:complete    → all files done, score ready
+review:failed      → analysis error
+review:posted      → GitHub comments posted
 ```
 
 ---
 
-## 🏆 Scoring System
+## 🏆 Scoring
 
 ```
-Overall Score = weighted average of category scores:
-
-  Security Score    × 40%
-  Bug Score         × 30%
-  Complexity Score  × 20%
-  Style Score       × 10%
-
-Each category starts at 100.
-Issues deduct points based on severity.
-Minimum: 0  |  Maximum: 100
-
-Grade:  A (90-100) | B (75-89) | C (60-74) | D (40-59) | F (0-39)
+Security  × 40% + Bugs × 30% + Complexity × 20% + Style × 10%
+Grade: A (90+) | B (75+) | C (60+) | D (40+) | F (<40)
 ```
 
 ---
 
 ## 🌐 Deployment
 
-| Service | Platform | URL |
-|---------|----------|-----|
-| Frontend | Vercel | Auto-deploy on push to main |
-| Backend | Railway | Auto-deploy on push to main |
-| ML Service | Render | Auto-deploy on push to main |
-| Database | MongoDB Atlas | Managed cloud |
-| Redis | Redis Cloud | Managed cloud |
+| Service | Platform |
+|---------|----------|
+| Frontend | Vercel |
+| Backend | Render |
+| ML Service | Render |
+| Database | MongoDB Atlas |
+| Redis | Redis Cloud |
 
 ---
 
@@ -511,36 +377,25 @@ cd codesense-backend
 npx jest --testPathPattern=Tests --coverage
 ```
 
-Tests cover:
-- Webhook signature verification (valid, invalid, missing)
-- Score calculation logic
-- Severity counting
-- ML service integration mocks
-- Auth controller (register, duplicate email, missing fields)
-
 ---
 
 ## 🗺️ Roadmap
 
 - [x] 3-service microservices architecture
-- [x] GitHub OAuth 2.0 authentication
-- [x] GitHub webhook integration
-- [x] BullMQ async job queue with Redis
-- [x] Python ML service (150+ security patterns)
+- [x] GitHub OAuth + Webhook integration
+- [x] BullMQ async job queue
+- [x] Python ML service (150+ patterns)
 - [x] Real-time Socket.IO dashboard
-- [x] Monaco Editor with inline issue markers
+- [x] Monaco Editor with issue markers
 - [x] GitHub inline PR comments
-- [x] Score breakdown with animated rings
-- [x] AI-powered fix suggestions (Gemini + Grok)
-- [x] Multi-provider AI fallback resilience
+- [x] AI fix suggestions (Gemini + Groq)
+- [x] Multi-provider AI fallback
 - [x] Full production deployment
-- [ ] VS Code extension
-- [ ] Self-learning ML from user feedback
-- [ ] Analytics dashboard with trend charts
+- [x] Docker Compose
+- [x] Jest unit tests
+- [ ] Self-learning ML from feedback
+- [ ] Analytics dashboard
 - [ ] Slack/email notifications
-- [ ] TypeScript support
-- [ ] Java + Go language support
-- [ ] Docker Compose for local setup
 
 ---
 
@@ -554,7 +409,7 @@ Tests cover:
 
 ## 📄 License
 
-This project is licensed under the MIT License.
+MIT License
 
 ---
 
