@@ -4,7 +4,7 @@ import { useState } from 'react'
 
 const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
 
-export default function IssueList({ issues = [], selectedFile = null }) {
+export default function IssueList({ issues = [], selectedFile = null, reviewId = null }) {
   const [filter,     setFilter]     = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
 
@@ -19,14 +19,13 @@ export default function IssueList({ issues = [], selectedFile = null }) {
 
   return (
     <div style={{
-      background:     'var(--bg-secondary)',
-      border:         '1px solid var(--border)',
-      borderRadius:   10,
-      display:        'flex',
-      flexDirection:  'column',
-      height:         '100%',
+      background:    'var(--bg-secondary)',
+      border:        '1px solid var(--border)',
+      borderRadius:  10,
+      display:       'flex',
+      flexDirection: 'column',
+      height:        '100%',
     }}>
-      {/* ── Header ──────────────────────────────── */}
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
@@ -72,7 +71,6 @@ export default function IssueList({ issues = [], selectedFile = null }) {
         </div>
       </div>
 
-      {/* ── Issues ──────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 20px' }}>
@@ -80,7 +78,9 @@ export default function IssueList({ issues = [], selectedFile = null }) {
             <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>No issues found</p>
           </div>
         ) : (
-          filtered.map((issue, i) => <IssueCard key={issue._id || issue.id || i} issue={issue} />)
+          filtered.map((issue, i) => (
+            <IssueCard key={issue._id || issue.id || i} issue={issue} reviewId={reviewId} />
+          ))
         )}
       </div>
     </div>

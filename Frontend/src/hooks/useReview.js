@@ -10,7 +10,7 @@ export const useReview = () => {
     addLiveUpdate, clearLiveUpdates, updateReviewStatus,
   } = useReviewStore()
 
-  const [reviewFiles, setReviewFiles] = useState([])
+  const [reviewFiles,  setReviewFiles]  = useState([])
   const [filesLoading, setFilesLoading] = useState(false)
 
   const fetchReviews = async (params = {}) => {
@@ -55,11 +55,7 @@ export const useReview = () => {
 
   const submitManualReview = async (code, language, filename) => {
     try {
-      const { data } = await api.post('/api/reviews/manual', {
-        code,
-        language,
-        filename,
-      })
+      const { data } = await api.post('/api/reviews/manual', { code, language, filename })
       toast.success('Review queued!')
       return data.data
     } catch (err) {
@@ -79,6 +75,18 @@ export const useReview = () => {
     }
   }
 
+  // ── Get AI Fix for an issue ──────────────────────────────
+  const getAIFix = async (reviewId, issueId) => {
+    try {
+      const { data } = await api.post(`/api/reviews/${reviewId}/issues/${issueId}/ai-fix`)
+      return data.data
+    } catch (err) {
+      const msg = err.response?.data?.message || 'AI service unavailable'
+      toast.error(msg)
+      throw err
+    }
+  }
+
   return {
     reviews,
     currentReview,
@@ -91,6 +99,7 @@ export const useReview = () => {
     fetchReviewFiles,
     submitManualReview,
     deleteReview,
+    getAIFix,
     addLiveUpdate,
     clearLiveUpdates,
     updateReviewStatus,

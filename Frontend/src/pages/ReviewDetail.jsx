@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { useReview } from '../hooks/useReview'
 import { useSocket } from '../hooks/useSocket'
 import ScoreCard  from '../components/review/ScoreCard'
-import IssueList  from '../components/review/IssueCard'
+import IssueList  from '../components/review/IssueList'
 import FileViewer from '../components/review/FileViewer'
 import LiveFeed   from '../components/review/LiveFeed'
 import { ArrowLeft, GitPullRequest, ExternalLink } from 'lucide-react'
@@ -168,7 +168,7 @@ export default function ReviewDetail() {
             <FileViewer files={files} issues={issues} />
           </div>
           <div style={{ height: 500 }}>
-            <IssueList issues={issues} />
+           <IssueList issues={issues} reviewId={id} />
           </div>
         </div>
 

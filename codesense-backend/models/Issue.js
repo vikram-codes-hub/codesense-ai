@@ -21,10 +21,19 @@ const issueSchema = new mongoose.Schema({
   suggestion : { type: String, default: "" },
   code       : { type: String, default: "" },
   isPostedToGitHub: { type: Boolean, default: false },
+
+  //AI Fix fields
+  aiExplanation : { type: String, default: null },
+  aiFixedCode   : { type: String, default: null },
+  aiFixDescription: { type: String, default: null },
+  aiConfidence  : { type: Number, default: null },
+  aiProvider    : { type: String, default: null },
+  aiGeneratedAt : { type: Date,   default: null },
+
 }, { timestamps: true });
 
-issueSchema.index({ reviewId: 1 });
-issueSchema.index({ reviewId: 1, type: 1 });
-issueSchema.index({ reviewId: 1, severity: 1 });
+issueSchema.index({ reviewId: 1 })
+issueSchema.index({ reviewId: 1, type: 1 })
+issueSchema.index({ reviewId: 1, severity: 1 })
 
-module.exports = mongoose.model("Issue", issueSchema);
+module.exports = mongoose.model("Issue", issueSchema)
