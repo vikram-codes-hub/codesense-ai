@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState,useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../utils/axios'
@@ -48,7 +49,23 @@ export default function Settings() {
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' })
   const [notifications, setNotifications] = useState({ email: true, webhook: true, weekly: false })
   const [saving, setSaving] = useState(null)
-
+  // Check for GitHub connection success and refresh user
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const github = params.get('github')
+    
+    if (github === 'connected') {
+      toast.success('GitHub account connected! ✓')
+      // Refresh user data to show updated GitHub status
+      api.get('/api/auth/me')
+        .then(({ data }) => {
+          setUser(data.data)
+        })
+        .catch(err => console.error('Failed to refresh user:', err))
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
   const handleSaveProfile = async () => {
     if (!profile.name || !profile.email) { toast.error('Please fill in all fields'); return }
     setSaving('profile')
@@ -82,10 +99,25 @@ export default function Settings() {
     }
   }
 
-  const handleConnectGitHub = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/github`
-  }
+ const handleConnectGitHub = () => {
+  const token = localStorage.getItem('token')
+  window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/github/connect?token=${token}`
+}
 
+const location = useLocation()
+
+useEffect(() => {
+  const params = new URLSearchParams(location.search)
+  if (params.get('github') === 'connected') {
+    toast.success('GitHub connected successfully!')
+    // Refresh user data
+    window.history.replaceState({}, '', '/settings')
+  }
+  if (params.get('error') === 'github_failed') {
+    toast.error('Failed to connect GitHub')
+    window.history.replaceState({}, '', '/settings')
+  }
+}, [])
   return (
     <div style={{ maxWidth: 680, animation: 'fadeIn 0.3s ease-out' }}>
 

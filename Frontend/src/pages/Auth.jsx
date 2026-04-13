@@ -177,8 +177,22 @@ export default function Auth() {
     const params = new URLSearchParams(window.location.search)
     const token  = params.get('token')
     const error  = params.get('error')
-    if (token) { localStorage.setItem('token', token); window.location.href = '/dashboard' }
-    if (error) toast.error('GitHub login failed. Please try again.')
+    const github = params.get('github')
+    
+    if (token) { 
+      localStorage.setItem('token', token)
+      if (github === 'connected') {
+        toast.success('GitHub connected successfully! ✓')
+      }
+      window.location.href = '/dashboard' 
+    }
+    if (error) {
+      if (error === 'github_connection_failed') {
+        toast.error('Failed to connect GitHub. Please try again.')
+      } else {
+        toast.error('Login failed. Please try again.')
+      }
+    }
   }, [])
 
   useEffect(() => {

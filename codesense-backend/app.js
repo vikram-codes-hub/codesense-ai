@@ -23,14 +23,12 @@ app.use(cors({
   credentials: true,
 }))
 
+// ── Body Parser ───────────────────────────────────
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
+
 // ── Rate Limiting ─────────────────────────────────
 app.use('/api/', rateLimitMiddleware)
-
-
-
-
-// app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
 
 // ── Passport ──────────────────────────────────────
 app.use(passport.initialize())
@@ -46,7 +44,7 @@ app.use('/api/repos',     repoRoutes)
 app.use('/api/reviews',   reviewRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/webhook',   webhookRoutes)
-app.use(express.json())
+
 // ── Health ────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'CodeSense API is running' })

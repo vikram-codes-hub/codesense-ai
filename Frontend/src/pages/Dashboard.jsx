@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import api from '../utils/axios'
+import toast from 'react-hot-toast'
 import StatsWidget   from '../components/dashboard/StatsWidget'
 import ActivityChart from '../components/dashboard/ActivityChart'
 import RecentReviews from '../components/dashboard/RecentReviews'
@@ -11,12 +12,30 @@ import {
 } from 'lucide-react'
 
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, setUser } = useAuth()
 
   const [stats,   setStats]   = useState(null)
   const [recent,  setRecent]  = useState([])
   const [repos,   setRepos]   = useState([])
   const [loading, setLoading] = useState(true)
+
+  // Check for GitHub connection success
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const github = params.get('github')
+    
+    if (github === 'connected') {
+      toast.success('GitHub account connected! ✓')
+      // Refresh user data to show updated GitHub status
+      api.get('/api/auth/me')
+        .then(({ data }) => {
+          setUser(data.data)
+        })
+        .catch(err => console.error('Failed to refresh user:', err))
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname)
+    }
+  }, [])
 
   useEffect(() => {
     const fetchAll = async () => {

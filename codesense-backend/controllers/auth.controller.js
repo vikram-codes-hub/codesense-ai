@@ -9,8 +9,10 @@ const register = async (req, res, next) => {
   try {
     const { name, email, password } = req.body
 
-    if (!name || !email || !password)
-      return error(res, 400, 'Please provide name, email and password')
+    const trimmedName = name?.trim()
+    const trimmedEmail = email?.trim()
+
+    if (!trimmedName || !trimmedEmail || !password) return error(res, 400, 'Please provide name, email and password')
 
     const exists = await User.findOne({ email })
     if (exists)
@@ -107,11 +109,16 @@ const logout = async (req, res, next) => {
 const githubCallback = async (req, res) => {
   try {
     const token = generateToken(req.user._id)
-    logger.info(`GitHub OAuth login: ${req.user.email}`)
-    res.redirect(`${process.env.CLIENT_URL}/auth?token=${token}`)
+    const isNewUser = !req.user.password 
+    
+    logger.info(`GitHub OAuth: ${req.user.email}`)
+    
+    // Redirect to dashboard with token
+    // Frontend will check if account was just linked or is a new login
+    res.redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&github=connected${isNewUser ? '&new=true' : ''}`)
   } catch (err) {
     logger.error(`GitHub callback error: ${err.message}`)
-    res.redirect(`${process.env.CLIENT_URL}/auth?error=oauth_failed`)
+    res.redirect(`${process.env.CLIENT_URL}/auth?error=github_connection_failed`)
   }
 }
 
@@ -139,5 +146,16 @@ const updatePassword = async (req, res, next) => {
     return success(res, 200, 'Password updated')
   } catch (err) { next(err) }
 }
+// ── GitHub Connect Callback ────────────────────────
+const githubConnectCallback = async (req, res) => {
+  try {
+    logger.info(`GitHub connected: ${req.user.email}`)
+    res.redirect(`${process.env.CLIENT_URL}/settings?github=connected`)
+  } catch (err) {
+    logger.error(`GitHub connect callback error: ${err.message}`)
+    res.redirect(`${process.env.CLIENT_URL}/settings?error=github_failed`)
+  }
+}
 
-module.exports = { register, login, getMe, logout, githubCallback, updateProfile, updatePassword }
+// Add to exports:
+module.exports = { register, login, getMe, logout, githubCallback, githubConnectCallback, updateProfile, updatePassword }

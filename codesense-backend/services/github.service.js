@@ -1,27 +1,112 @@
-const { Worker } = require('bullmq')
-const axios      = require('axios')
-const Issue      = require('../models/Issue')
-const Review     = require('../models/Review')
-const connection = require('../config/bullmq')
-const logger     = require('../utils/logger')
+const axios  = require('axios')
+const logger = require('../utils/logger')
 
-const postComment = async (repoFullName, prNumber, commitSha, filename, line, body, token) => {
-  await axios.post(
-    `https://api.github.com/repos/${repoFullName}/pulls/${prNumber}/comments`,
-    { body, commit_id: commitSha, path: filename, line, side: 'RIGHT' },
-    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', 'X-GitHub-Api-Version': '2022-11-28' } }
-  )
+const GITHUB_API = 'https://api.github.com'
+const TOKEN      = process.env.GITHUB_TOKEN
+
+const githubClient = (token = TOKEN) => axios.create({
+  baseURL: GITHUB_API,
+  headers: {
+    Authorization: `Bearer ${token}`,
+    Accept:        'application/vnd.github.v3+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  },
+})
+
+// ── Fetch PR Files ─────────────────────────────────────────
+const fetchPRFiles = async (repoFullName, prNumber, token) => {
+  try {
+    const client   = githubClient(token)
+    const response = await client.get(`/repos/${repoFullName}/pulls/${prNumber}/files`)
+    return response.data
+      .filter(f => f.status !== 'removed')
+      .filter(f => isSupportedFile(f.filename))
+      .map(f => ({
+        filename:  f.filename,
+        patch:     f.patch || '',
+        additions: f.additions,
+        deletions: f.deletions,
+        raw_url:   f.raw_url,
+      }))
+  } catch (err) {
+    logger.error(`fetchPRFiles error: ${err.message}`)
+    throw err
+  }
 }
 
-const postSummary = async (repoFullName, prNumber, body, token) => {
-  await axios.post(
-    `https://api.github.com/repos/${repoFullName}/issues/${prNumber}/comments`,
-    { body },
-    { headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.v3+json', 'X-GitHub-Api-Version': '2022-11-28' } }
-  )
+// ── Fetch File Content ─────────────────────────────────────
+const fetchFileContent = async (rawUrl, token) => {
+  try {
+    const response = await axios.get(rawUrl, {
+      headers: { Authorization: `Bearer ${token || TOKEN}` },
+    })
+    return response.data
+  } catch (err) {
+    logger.error(`fetchFileContent error: ${err.message}`)
+    return ''
+  }
 }
 
-const buildSummary = (review) => {
+// ── Post Inline Comment ────────────────────────────────────
+const postInlineComment = async (repoFullName, prNumber, commitSha, filename, line, body, token) => {
+  try {
+    const client = githubClient(token)
+    await client.post(
+      `/repos/${repoFullName}/pulls/${prNumber}/comments`,
+      { body, commit_id: commitSha, path: filename, line, side: 'RIGHT' }
+    )
+    logger.info(`Comment posted: ${filename}:${line}`)
+  } catch (err) {
+    logger.error(`postInlineComment error: ${err.message}`)
+  }
+}
+
+// ── Post Summary Comment ───────────────────────────────────
+const postSummaryComment = async (repoFullName, prNumber, body, token) => {
+  try {
+    const client = githubClient(token)
+    await client.post(`/repos/${repoFullName}/issues/${prNumber}/comments`, { body })
+    logger.info(`Summary comment posted on PR #${prNumber}`)
+  } catch (err) {
+    logger.error(`postSummaryComment error: ${err.message}`)
+  }
+}
+
+// ── Add Webhook ────────────────────────────────────────────
+const addWebhook = async (repoFullName, token) => {
+  try {
+    const client   = githubClient(token)
+    const response = await client.post(`/repos/${repoFullName}/hooks`, {
+      name:   'web',
+      active: true,
+      events: ['pull_request'],
+      config: {
+        url:          `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/webhook/github`,
+        content_type: 'json',
+        secret:       process.env.GITHUB_WEBHOOK_SECRET,
+      },
+    })
+    logger.info(`Webhook added: ${repoFullName}`)
+    return response.data.id
+  } catch (err) {
+    logger.error(`addWebhook error: ${err.message}`)
+    throw err
+  }
+}
+
+// ── Remove Webhook ─────────────────────────────────────────
+const removeWebhook = async (repoFullName, webhookId, token) => {
+  try {
+    const client = githubClient(token)
+    await client.delete(`/repos/${repoFullName}/hooks/${webhookId}`)
+    logger.info(`Webhook removed: ${repoFullName}`)
+  } catch (err) {
+    logger.error(`removeWebhook error: ${err.message}`)
+  }
+}
+
+// ── Format Summary Comment ─────────────────────────────────
+const formatSummaryComment = (review) => {
   const score = review.overallScore
   const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F'
   const emoji = { A: '🟢', B: '🟡', C: '🟠', D: '🔴', F: '⛔' }[grade]
@@ -42,59 +127,36 @@ const buildSummary = (review) => {
 - 🟡 Medium: ${review.mediumCount}
 - 🔵 Low: ${review.lowCount}
 
-> *Powered by CodeSense AI*`
+> *Powered by [CodeSense AI](${process.env.CLIENT_URL})*`
 }
 
-const initGithubWorker = (redisConnection) => {
-  const worker = new Worker('github', async (job) => {
-    const { reviewId, repoFullName, prNumber, githubToken } = job.data
-
-    logger.info(`Posting GitHub comments → PR #${prNumber} | ${repoFullName}`)
-
-    const issues = await Issue.find({ reviewId, isPostedToGitHub: false }).sort({ severity: 1 })
-    const review = await Review.findById(reviewId)
-    if (!review) throw new Error(`Review not found: ${reviewId}`)
-
-    let postedCount = 0
-
-    for (const issue of issues) {
-      try {
-        const body = [
-          `**[${issue.severity.toUpperCase()}] ${issue.message}**`,
-          '',
-          issue.description || '',
-          issue.suggestion ? `\n💡 **Suggestion:** ${issue.suggestion}` : '',
-        ].filter(Boolean).join('\n')
-
-        await postComment(repoFullName, prNumber, review.commitSha, issue.filename, issue.line || 1, body, githubToken)
-        await Issue.findByIdAndUpdate(issue._id, { isPostedToGitHub: true })
-        postedCount++
-        await new Promise(r => setTimeout(r, 300))
-      } catch (err) {
-        logger.error(`Failed to post comment: ${err.message}`)
-      }
-    }
-
-    try {
-      await postSummary(repoFullName, prNumber, buildSummary(review), githubToken)
-    } catch (err) {
-      logger.error(`Failed to post summary: ${err.message}`)
-    }
-
-    await Review.findByIdAndUpdate(reviewId, { isPostedToGitHub: true })
-    global.io?.emit('review:posted', { reviewId, prNumber, repoFullName, postedCount })
-    logger.info(`GitHub comments posted → ${postedCount}/${issues.length}`)
-    return { reviewId, postedCount }
-
-  }, { connection: redisConnection, concurrency: 1 })
-
-  worker.on('completed', (job) => logger.info(`GitHub worker: job ${job.id} completed`))
-  worker.on('failed',    (job, err) => logger.error(`GitHub worker: job ${job.id} failed: ${err.message}`))
-  worker.on('error',     (err) => logger.error(`GitHub worker error: ${err.message}`))
-
-  logger.info('GitHub worker initialized')
-  return worker
+// ── Fetch User Repos ───────────────────────────────────────
+const fetchUserRepos = async (token) => {
+  const client   = githubClient(token)
+  const response = await client.get('/user/repos?per_page=100&sort=updated')
+  return response.data.map(r => ({
+    id:        r.id,
+    name:      r.name,
+    fullName:  r.full_name,
+    language:  r.language,
+    isPrivate: r.private,
+    stars:     r.stargazers_count,
+  }))
 }
 
-const githubWorker = initGithubWorker(connection)
-module.exports = { githubWorker }
+// ── Helper ─────────────────────────────────────────────────
+const isSupportedFile = (filename) => {
+  const supported = ['.js', '.jsx', '.ts', '.tsx', '.py', '.java', '.cpp', '.c']
+  return supported.some(ext => filename.endsWith(ext))
+}
+
+module.exports = {
+  fetchPRFiles,
+  fetchFileContent,
+  postInlineComment,
+  postSummaryComment,
+  addWebhook,
+  removeWebhook,
+  formatSummaryComment,
+  fetchUserRepos,
+}
