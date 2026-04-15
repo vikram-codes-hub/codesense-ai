@@ -48,7 +48,7 @@ async (accessToken, refreshToken, profile, done) => {
 passport.use('github-connect', new GitHubStrategy({
   clientID:     process.env.GITHUB_CLIENT_ID,
   clientSecret: process.env.GITHUB_CLIENT_SECRET,
-  callbackURL:  `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/github/connect/callback`,
+  callbackURL:  process.env.GITHUB_CALLBACK_URL,
   scope:        ['user:email'],
   passReqToCallback: true,
 },

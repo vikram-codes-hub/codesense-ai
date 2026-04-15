@@ -26,9 +26,14 @@ router.get("/github/callback",
 )
 
 // ── GitHub Connect (for logged-in email users) ─────
-router.get("/github/connect", protect, (req, res, next) => {
-  // Pass JWT token as state so we can identify user in callback
-  const token = req.headers.authorization?.split(' ')[1]
+router.get("/github/connect", (req, res, next) => {
+  // Get token from query parameter or Authorization header
+  let token = req.query.token || req.headers.authorization?.split(' ')[1]
+  
+  if (!token) {
+    return res.status(401).json({ success: false, message: 'Not authorized, no token' })
+  }
+  
   passport.authenticate("github-connect", {
     session: false,
     state: token,

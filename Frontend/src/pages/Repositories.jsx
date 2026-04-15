@@ -26,13 +26,10 @@ export default function Repositories() {
     await disconnectRepo(repoId)
   }
 
-  const handleConnect = async (githubRepo) => {
-    await connectRepo({
-      repoName:     githubRepo.name,
-      repoFullName: githubRepo.fullName,
-      githubRepoId: githubRepo.id,
-      language:     githubRepo.language || 'Unknown',
-    })
+  const handleConnect = async (repo) => {
+    // The modal already made the API call and connected the repo
+    // Refetch the repos list to show the newly connected repo
+    await fetchRepos()
     setShowModal(false)
   }
 
