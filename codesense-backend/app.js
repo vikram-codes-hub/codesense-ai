@@ -23,12 +23,18 @@ app.use(cors({
   credentials: true,
 }))
 
+// ── Webhook Route with Raw Body Parser (MUST be before app.use(express.json())) ─
+app.use('/api/webhook', express.raw({ type: 'application/json' }), webhookRoutes)
+
 // ── Body Parser ───────────────────────────────────
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
-// ── Rate Limiting ─────────────────────────────────
-app.use('/api/', rateLimitMiddleware)
+// ── Rate Limiting (skip webhooks) ─────────────────
+app.use('/api/', (req, res, next) => {
+  if (req.path.startsWith('/webhook')) return next()
+  rateLimitMiddleware(req, res, next)
+})
 
 // ── Passport ──────────────────────────────────────
 app.use(passport.initialize())
@@ -43,7 +49,6 @@ app.use('/api/auth',      authRoutes)
 app.use('/api/repos',     repoRoutes)
 app.use('/api/reviews',   reviewRoutes)
 app.use('/api/dashboard', dashboardRoutes)
-app.use('/api/webhook',   webhookRoutes)
 
 // ── Health ────────────────────────────────────────
 app.get('/api/health', (req, res) => {
