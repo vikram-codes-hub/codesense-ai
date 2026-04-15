@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useReview }  from '../hooks/useReview'
 import { useSocket }  from '../hooks/useSocket'
+import useManualReviewStore from '../store/manualReviewStore'
 import ScoreCard from '../components/review/ScoreCard'
 import IssueList from '../components/review/IssueList'
 import LiveFeed  from '../components/review/LiveFeed'
-import { FileCode, Play, RotateCcw, ChevronDown } from 'lucide-react'
+import { FileCode, Play, RotateCcw, ChevronDown, Square } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const languages = [
@@ -33,36 +34,30 @@ function processUserData(req, res) {
 }`
 
 export default function ManualReview() {
-  const { submitManualReview, liveUpdates, currentReview } = useReview()
+  const { submitManualReview } = useReview()
   const { socket } = useSocket()
+  const {
+    code, language, loading, analyzed, result, issues, reviewId, liveEvents,
+    setCode, setLanguage, setLoading, setAnalyzed, setReviewId,
+    setResult, setIssues, setLiveEvents, addEvent, reset, startAnalysis,
+    completeAnalysis, stopAnalysis
+  } = useManualReviewStore()
 
-  const [code,      setCode]      = useState('')
-  const [language,  setLanguage]  = useState('javascript')
-  const [loading,   setLoading]   = useState(false)
-  const [analyzed,  setAnalyzed]  = useState(false)
-  const [reviewId,  setReviewId]  = useState(null)
-  const [result,    setResult]    = useState(null)
-  const [issues,    setIssues]    = useState([])
-  const [liveEvents, setLiveEvents] = useState([])
+  const handlersRef = useRef({})
 
-  // ── Listen to socket events for this review ───────────
-  const addEvent = (event, message) => {
-    setLiveEvents(prev => [...prev, {
-      id:      Date.now(),
-      event,
-      message,
-      time:    new Date().toLocaleTimeString(),
-    }])
-  }
+  // ── Clean up socket listeners on unmount ───────────
+  useEffect(() => {
+    return () => {
+      if (socket && reviewId && handlersRef.current.cleanup) {
+        handlersRef.current.cleanup()
+      }
+    }
+  }, [socket, reviewId])
 
   const handleAnalyze = async () => {
     if (!code.trim()) { toast.error('Please paste some code first'); return }
 
-    setLoading(true)
-    setAnalyzed(false)
-    setLiveEvents([])
-    setResult(null)
-    setIssues([])
+    startAnalysis()
 
     try {
       addEvent('review:queued', 'Manual review queued')
@@ -76,21 +71,17 @@ export default function ManualReview() {
       setReviewId(data.reviewId)
       addEvent('review:started', 'Analysis started — 1 file')
 
-      // ── Poll for completion via socket ────────────────
+      // ── Setup socket listeners ────────────────────────
       if (socket) {
-        socket.emit('subscribe:review', { reviewId: data.reviewId })
-
-        socket.once('review:file:done', (d) => {
+        const handleFileDone = (d) => {
+          console.log('📥 File done event received:', d)
           addEvent('review:file:done', `File analyzed — Score: ${d.fileScore} — ${d.issuesFound} issues`)
-        })
+        }
 
-        socket.once('review:complete', async (d) => {
+        const handleComplete = async (d) => {
+          console.log('✅ Complete event received:', d)
           addEvent('review:complete', `Complete — Score: ${d.overallScore}/100 | ${d.totalIssues} issues`)
-          setResult(d)
-          setAnalyzed(true)
-          setLoading(false)
-          toast.success('Analysis complete!')
-
+          
           // Fetch full review details
           try {
             const { default: api } = await import('../utils/axios')
@@ -98,33 +89,61 @@ export default function ManualReview() {
               api.get(`/api/reviews/${d.reviewId}`),
               api.get(`/api/reviews/${d.reviewId}/files`),
             ])
-            setResult(reviewRes.data.data.review)
-            setIssues(reviewRes.data.data.issues || [])
+            completeAnalysis(reviewRes.data.data.review, reviewRes.data.data.issues || [])
+            toast.success('Analysis complete!')
           } catch (e) {
             console.error('Failed to fetch review details:', e)
+            completeAnalysis(d, [])
           }
-        })
 
-        socket.once('review:failed', (d) => {
+          // Cleanup
+          cleanup()
+        }
+
+        const handleFailed = (d) => {
+          console.log('❌ Failed event received:', d)
           addEvent('review:failed', `Failed: ${d.error}`)
           toast.error('Analysis failed')
-          setLoading(false)
-        })
+          stopAnalysis()
+          cleanup()
+        }
+
+        const cleanup = () => {
+          console.log('🧹 Cleaning up socket listeners')
+          socket.emit('unsubscribe:review', { reviewId: data.reviewId })
+          socket.off('review:file:done', handleFileDone)
+          socket.off('review:complete', handleComplete)
+          socket.off('review:failed', handleFailed)
+        }
+
+        // Store cleanup function for unmount
+        handlersRef.current.cleanup = cleanup
+
+        // Subscribe and setup listeners
+        socket.emit('subscribe:review', { reviewId: data.reviewId })
+        socket.on('review:file:done', handleFileDone)
+        socket.on('review:complete', handleComplete)
+        socket.on('review:failed', handleFailed)
+
+        console.log('🔌 Socket listeners setup for review:', data.reviewId)
       }
 
     } catch (err) {
       setLoading(false)
-      // error handled in hook
+      toast.error('Failed to start analysis')
     }
   }
 
-  const handleReset = () => {
-    setCode('')
-    setAnalyzed(false)
-    setLiveEvents([])
-    setResult(null)
-    setIssues([])
-    setReviewId(null)
+  const handleStop = () => {
+    console.log('⏹️ Stopping analysis for review:', reviewId)
+    stopAnalysis()
+    if (socket && reviewId) {
+      socket.emit('unsubscribe:review', { reviewId })
+    }
+    if (handlersRef.current.cleanup) {
+      handlersRef.current.cleanup()
+    }
+    toast.info('Analysis stopped')
   }
 
   return (
@@ -195,9 +214,21 @@ export default function ManualReview() {
               {/* Actions */}
               <div style={{ display: 'flex', gap: 6 }}>
                 {analyzed && (
-                  <button onClick={handleReset} className="btn-secondary"
+                  <button onClick={reset} className="btn-secondary"
                     style={{ padding: '5px 10px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
                     <RotateCcw size={12} /> Reset
+                  </button>
+                )}
+                {loading && (
+                  <button onClick={handleStop} className="btn-danger"
+                    style={{ 
+                      padding: '5px 10px', fontSize: 12, 
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      background: '#ef4444', color: 'white',
+                      border: '1px solid #dc2626',
+                      cursor: 'pointer'
+                    }}>
+                    <Square size={12} /> Stop
                   </button>
                 )}
                 <button

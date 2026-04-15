@@ -113,9 +113,8 @@ const githubCallback = async (req, res) => {
     
     logger.info(`GitHub OAuth: ${req.user.email}`)
     
-    // Redirect to dashboard with token
-    // Frontend will check if account was just linked or is a new login
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?token=${token}&github=connected${isNewUser ? '&new=true' : ''}`)
+    // Redirect to auth page with token (Auth.jsx will handle it and navigate to dashboard)
+    res.redirect(`${process.env.CLIENT_URL}/auth?token=${token}&github=connected${isNewUser ? '&new=true' : ''}`)
   } catch (err) {
     logger.error(`GitHub callback error: ${err.message}`)
     res.redirect(`${process.env.CLIENT_URL}/auth?error=github_connection_failed`)

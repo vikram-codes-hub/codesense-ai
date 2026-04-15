@@ -5,6 +5,12 @@ const Issue            = require('../models/Issue')
 const Repository       = require('../models/Repository')
 const { analyzeCode }  = require('../services/mlBridge.service')
 const { addGithubJob } = require('../queues/github.queue')
+const { 
+  emitReviewStarted, 
+  emitReviewFileDone, 
+  emitReviewComplete, 
+  emitReviewFailed 
+} = require('../socket')
 const connection       = require('../config/bullmq')
 const logger           = require('../utils/logger')
 
@@ -18,8 +24,7 @@ const initReviewWorker = (redisConnection) => {
     // ── Step 1: Mark as running ───────────────────────────
     await Review.findByIdAndUpdate(reviewId, { status: 'running' })
 
-    global.io?.emit('review:started', {
-      reviewId,
+    emitReviewStarted(reviewId, {
       totalFiles: files.length,
     })
 
@@ -63,8 +68,7 @@ const initReviewWorker = (redisConnection) => {
         }
 
         // Emit per-file progress
-        global.io?.emit('review:file:done', {
-          reviewId,
+        emitReviewFileDone(reviewId, {
           filename:    file.filename,
           fileScore:   result.score        || 0,
           issuesFound: result.total_issues || 0,
@@ -124,8 +128,7 @@ const initReviewWorker = (redisConnection) => {
     }
 
     // ── Step 8: Emit completion ───────────────────────────
-    global.io?.emit('review:complete', {
-      reviewId,
+    emitReviewComplete(reviewId, {
       overallScore: scores.overall,
       totalIssues:  allIssues.length,
       criticalCount,
@@ -156,6 +159,13 @@ const initReviewWorker = (redisConnection) => {
   }, {
     connection:  redisConnection,
     concurrency: 2,
+    settings: {
+      lockDuration:    60000, // 60 seconds
+      lockRenewTime:   15000, // Renew every 15 seconds
+      maxStalledCount: 2,
+      stalledInterval: 30000, // Check every 30 seconds
+      retryProcessDelay: 5000, // Wait 5 sec before retry
+    }
   })
 
   worker.on('completed', (job) => {
@@ -169,8 +179,7 @@ const initReviewWorker = (redisConnection) => {
         status: 'failed',
         error:  err.message,
       })
-      global.io?.emit('review:failed', {
-        reviewId: job.data.reviewId,
+      emitReviewFailed(job.data.reviewId, {
         error:    err.message,
       })
     }

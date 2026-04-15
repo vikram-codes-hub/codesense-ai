@@ -45,3 +45,6 @@ Thumbs.db
 # ── Testing ────────────────────────────
 coverage/
 .nyc_output/
+
+# ── Documentation ──────────────────────
+PROCEDURE.md

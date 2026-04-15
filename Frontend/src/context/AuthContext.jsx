@@ -26,8 +26,12 @@ export const AuthProvider = ({ children }) => {
           setUser(data.data)
           setIsAuthenticated(true)
         })
-        .catch(() => {
+        .catch((err) => {
+          // Token is invalid or expired, clear it
           localStorage.removeItem('token')
+          setToken(null)
+          setIsAuthenticated(false)
+          console.error('Token verification failed:', err.message)
         })
         .finally(() => setLoading(false))
     } else {
