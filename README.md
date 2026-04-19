@@ -34,7 +34,7 @@
 
 | Service | URL | Platform |
 |---------|-----|----------|
-| 🖥️ **Frontend** | [codesense-ai-5pvs.vercel.app](https://codesense-ai-5pvs.vercel.app/auth) | Vercel |
+| 🖥️ **Frontend** | [codesense-ai-5pvs.vercel.app](https://codesense-ai-2mqt.vercel.app/auth) | Vercel |
 | ⚙️ **Backend API** | [codesense-ai-1-d8u8.onrender.com](https://codesense-ai-1-d8u8.onrender.com) | Render |
 | 🤖 **ML Service** | [codesense-ai-fifb.onrender.com](https://codesense-ai-fifb.onrender.com) | Render |
 
